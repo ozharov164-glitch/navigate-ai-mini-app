@@ -13,7 +13,7 @@ const API = apiBase();
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const initData = getInitData();
   if (!initData) {
-    throw new Error("Откройте Mini App из Telegram-бота @navigai_bot");
+    throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
   }
 
   let res: Response;
