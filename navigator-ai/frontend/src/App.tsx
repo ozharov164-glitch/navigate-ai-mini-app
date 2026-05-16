@@ -162,7 +162,6 @@ export default function App() {
           {tab === "more" && (
             <MorePage
               isPremium={data?.is_premium ?? false}
-              routeProvider={data?.route_provider ?? "auto"}
               onTheme={toggleTheme}
               theme={theme}
               scrollTo={moreScroll}

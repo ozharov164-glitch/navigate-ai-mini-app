@@ -82,7 +82,6 @@ export interface Dashboard {
   daily_actions_used: number;
   is_premium: boolean;
   theme: "dark" | "light";
-  route_provider: "auto" | "yandex" | "osrm";
   user_templates?: UserTemplate[];
 }
 
@@ -193,7 +192,7 @@ export const api = {
     request("/dashboard/places", { method: "POST", body: JSON.stringify({ name, address }) }),
   privacy: () => request<{ stored_items: string[]; retention_policy: string; encryption: string }>("/dashboard/privacy"),
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
-  updateSettings: (payload: { theme?: string; route_provider?: string }) =>
+  updateSettings: (payload: { theme?: string }) =>
     request("/dashboard/settings", { method: "PATCH", body: JSON.stringify(payload) }),
   createTemplate: (title: string, prompt: string, templateKey?: string) =>
     request<UserTemplate>("/dashboard/templates", {

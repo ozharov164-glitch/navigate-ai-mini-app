@@ -156,8 +156,6 @@ class DashboardOut(BaseModel):
     daily_actions_used: int
     is_premium: bool
     theme: str = "dark"
-    route_provider: str = "auto"
-
 
 class AnalyzeIn(BaseModel):
     text: str | None = None
@@ -177,4 +175,3 @@ class UserSettingsUpdate(BaseModel):
     theme: str | None = None
     timezone: str | None = None
     proactive_enabled: bool | None = None
-    route_provider: str | None = None  # auto | yandex | osrm

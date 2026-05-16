@@ -57,7 +57,7 @@ def _route_provider(route: Route) -> str:
         p = route.route_data.get("provider", "")
         if route.route_data.get("fallback"):
             return "fallback"
-        if p in ("yandex", "osrm", "link_only"):
+        if p == "yandex":
             return p
     return "fallback"
 
@@ -155,7 +155,6 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         daily_actions_used=used,
         is_premium=is_premium,
         theme=user.theme or "dark",
-        route_provider=user.route_provider or "auto",
         user_templates=[UserTemplateOut.model_validate(t) for t in templates],
     )
 
@@ -349,12 +348,9 @@ async def update_settings(body: UserSettingsUpdate, user: User = Depends(get_cur
         user.timezone = body.timezone
     if body.proactive_enabled is not None:
         user.proactive_enabled = body.proactive_enabled
-    if body.route_provider in ("auto", "yandex", "osrm"):
-        user.route_provider = body.route_provider
     return {
         "ok": True,
         "theme": user.theme,
-        "route_provider": user.route_provider or "auto",
     }
 
 

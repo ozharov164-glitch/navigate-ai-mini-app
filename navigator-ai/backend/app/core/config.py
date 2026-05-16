@@ -61,10 +61,6 @@ class Settings(BaseSettings):
     yandex_daily_limit: int = 800
     yandex_static_disable_above: int = 700  # отключить Static API при превышении счётчика
     yandex_static_map_enabled: bool = True
-    osrm_base_url: str = "http://osrm:5000"
-    osrm_public_fallback: str = "https://router.project-osrm.org"
-    nominatim_url: str = "https://nominatim.openstreetmap.org"
-
     # Локальный Whisper (экономия OpenRouter ASR)
     whisper_enabled: bool = False
     whisper_url: str = "http://whisper:8000"

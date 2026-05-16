@@ -70,27 +70,17 @@ FREE_DAILY_ACTIONS=10
 PREMIUM_DAILY_ACTIONS=50
 AI_JSON_RETRIES_PREMIUM=1
 YANDEX_DAILY_LIMIT=800
-OSRM_BASE_URL=http://osrm:5000
-OSRM_PUBLIC_FALLBACK=https://router.project-osrm.org
 YANDEX_STATIC_DISABLE_ABOVE=700
+YANDEX_MAPS_API_KEY=ваш-ключ-яндекс-карт
 PREMIUM_ONLY_MULTIMEDIA=true
 WHISPER_ENABLED=false
 ```
 
-### OSRM на VPS (self-hosted)
+### Яндекс.Карты
 
-1. Подготовка карты (один раз, ~15–30 мин):
-
-```bash
-cd navigator-ai
-./scripts/setup-osrm-data.sh ./osrm-data
-```
-
-2. Смонтируйте volume в `docker-compose.prod.yml` (`osrm_data` → данные `map.osrm`).
-
-3. `docker compose -f docker-compose.prod.yml up -d osrm backend`
-
-Без данных OSRM backend использует `OSRM_PUBLIC_FALLBACK`.
+В [developer.tech.yandex.ru](https://developer.tech.yandex.ru/) создайте ключ с API: Geocoder, Router, Static Maps.  
+Пропишите в `.env.production`: `YANDEX_MAPS_API_KEY=...`  
+Без ключа маршруты работают как ссылка «Открыть в Яндекс.Картах» (без времени и картинки).
 
 ### Whisper (опционально, экономия ASR)
 
