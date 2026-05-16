@@ -1,4 +1,4 @@
-import type { Task } from "@/lib/api";
+import { apiBase, type Task } from "@/lib/api";
 
 interface Props {
   tasks: Task[];
@@ -38,7 +38,7 @@ export function CalendarPage({ tasks }: Props) {
           </ul>
         )}
       </section>
-      <a className="glass-btn block text-center text-sm" href={import.meta.env.VITE_API_URL + "/export/ical"}>
+      <a className="glass-btn block text-center text-sm" href={`${apiBase()}/export/ical`}>
         📅 Экспорт iCal
       </a>
     </div>

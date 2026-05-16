@@ -28,7 +28,7 @@ jobs:
 
       - name: Install & build
         env:
-          VITE_API_URL: https://31-128-42-170.sslip.io
+          VITE_API_URL: https://31-128-42-170.sslip.io/api
           VITE_BASE_PATH: /navigate-ai-mini-app/
         run: |
           npm ci

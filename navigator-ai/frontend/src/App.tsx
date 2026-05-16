@@ -26,7 +26,8 @@ export default function App() {
       const d = await api.dashboard();
       setData(d);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      const msg = e instanceof Error ? e.message : "Ошибка загрузки";
+      setError(msg === "Load failed" || msg === "Failed to fetch" ? "Нет связи с сервером" : msg);
     } finally {
       setLoading(false);
     }

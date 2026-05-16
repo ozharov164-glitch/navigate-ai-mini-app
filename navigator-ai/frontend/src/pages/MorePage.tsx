@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, apiBase } from "@/lib/api";
 import { getInitData } from "@/lib/telegram";
 
 interface Props {
@@ -23,7 +23,7 @@ export function MorePage({ isPremium, onTheme }: Props) {
   }, []);
 
   const exportIcal = () => {
-    window.open(`${import.meta.env.VITE_API_URL || "/api"}/export/ical?init=${encodeURIComponent(getInitData())}`, "_blank");
+    window.open(`${apiBase()}/export/ical?init=${encodeURIComponent(getInitData())}`, "_blank");
   };
 
   const exportPdf = () => {
@@ -31,7 +31,7 @@ export function MorePage({ isPremium, onTheme }: Props) {
       alert("PDF только для премиум");
       return;
     }
-    window.open(`${import.meta.env.VITE_API_URL || "/api"}/export/pdf`, "_blank");
+    window.open(`${apiBase()}/export/pdf`, "_blank");
   };
 
   const deleteAll = async () => {

@@ -1,19 +1,42 @@
 import { getInitData } from "./telegram";
 
-const API = import.meta.env.VITE_API_URL || "/api";
+/** Базовый URL API всегда с суффиксом /api (VITE_API_URL может быть с доменом или без). */
+export function apiBase(): string {
+  const raw = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+  if (raw.endsWith("/api")) return raw;
+  if (raw.startsWith("http")) return `${raw}/api`;
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
+const API = apiBase();
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Telegram-Init-Data": getInitData(),
-      ...(options.headers as Record<string, string>),
-    },
-  });
+  const initData = getInitData();
+  if (!initData) {
+    throw new Error("Откройте Mini App из Telegram-бота @navigai_bot");
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": initData,
+        ...(options.headers as Record<string, string>),
+      },
+    });
+  } catch {
+    throw new Error("Нет связи с сервером. Проверьте интернет и повторите.");
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Ошибка запроса");
+    const detail = err.detail || res.statusText;
+    if (res.status === 401) {
+      throw new Error(typeof detail === "string" ? detail : "Требуется авторизация Telegram");
+    }
+    throw new Error(typeof detail === "string" ? detail : "Ошибка запроса");
   }
   return res.json();
 }

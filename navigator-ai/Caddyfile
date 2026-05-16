@@ -8,5 +8,5 @@
     handle /health {
         reverse_proxy backend:8000
     }
-    respond "NavigAI API" 200
+    respond "NavigAI API — use /api/*" 404
 }
