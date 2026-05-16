@@ -1,7 +1,7 @@
 """Dashboard и CRUD для Mini App."""
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +45,7 @@ from backend.app.services.gamification_service import gamification_service
 from backend.app.services.product_insights_service import product_insights_service
 from backend.app.core.uploads import read_upload_limited
 from backend.app.services.action_processor import action_processor
+from backend.app.services.osrm_maps import osrm_maps
 from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -64,7 +65,44 @@ def _route_provider(route: Route) -> str:
 
 def _route_out(route: Route) -> RouteOut:
     out = RouteOut.model_validate(route)
-    return out.model_copy(update={"route_provider": _route_provider(route)})
+    provider = _route_provider(route)
+    maps_url = out.yandex_maps_url
+    static_url = out.static_map_url
+
+    rd = route.route_data if isinstance(route.route_data, dict) else {}
+    from_g, to_g = rd.get("from"), rd.get("to")
+    if from_g and to_g and "lat" in from_g and "lon" in from_g:
+        maps_url = osrm_maps.yandex_maps_link(from_g, to_g)
+        static_url = osrm_maps.proxy_map_url(from_g, to_g)
+    elif out.static_map_url and "openstreetmap.de" in (out.static_map_url or ""):
+        # старые записи с битым URL — пересобрать превью если есть координаты
+        if from_g and to_g:
+            static_url = osrm_maps.proxy_map_url(from_g, to_g)
+
+    return out.model_copy(
+        update={
+            "route_provider": provider,
+            "yandex_maps_url": maps_url,
+            "static_map_url": static_url,
+        }
+    )
+
+
+@router.get("/map-preview")
+async def map_preview(
+    fl: float,
+    fo: float,
+    tl: float,
+    tol: float,
+    user: User = Depends(get_current_user),
+):
+    """Прокси превью карты (OSM static), чтобы Mini App не блокировал внешние домены."""
+    _ = user
+    try:
+        body, ctype = await osrm_maps.fetch_static_preview(fl, fo, tl, tol)
+        return Response(content=body, media_type=ctype, headers={"Cache-Control": "public, max-age=3600"})
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.get("", response_model=DashboardOut)

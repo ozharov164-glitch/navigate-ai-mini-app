@@ -54,6 +54,9 @@ class Settings(BaseSettings):
         "Если данных мало — пустые массивы и понятный summary."
     )
 
+    # Публичный URL API (для превью карт в Mini App)
+    public_api_base: str = "https://31-128-42-170.sslip.io/api"
+
     # Маршруты: публичный OSRM + Nominatim (нагрузка на VPS только кэш)
     osrm_base_url: str = "https://router.project-osrm.org"
     osrm_public_fallback: str = "https://routing.openstreetmap.de"

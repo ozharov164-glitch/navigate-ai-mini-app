@@ -1,4 +1,5 @@
-"""OSRM + Nominatim — бесплатная маршрутизация без ключа Яндекса."""
+"""OSRM + Nominatim — маршрут и превью OSM; ссылка открытия — Яндекс.Карты."""
+import base64
 import hashlib
 import logging
 from typing import Any
@@ -12,7 +13,6 @@ from backend.app.core.redis_client import cache_get, cache_set
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Публичный OSRM (для production лучше свой инстанс на VPS)
 OSRM_PROFILE = {"auto": "driving", "transit": "driving", "pedestrian": "foot"}
 
 
@@ -46,6 +46,83 @@ class OsrmMapsService:
         await cache_set(cache_key, result, ttl=settings.cache_ttl_seconds)
         return result
 
+    def yandex_maps_link(self, from_geo: dict, to_geo: dict) -> str:
+        """Ссылка для пользователя — Яндекс.Карты (без API-ключа)."""
+        return (
+            f"https://yandex.ru/maps/?rtext={from_geo['lat']},{from_geo['lon']}~"
+            f"{to_geo['lat']},{to_geo['lon']}&rtt=auto"
+        )
+
+    def yandex_maps_link_text(self, from_address: str, to_address: str) -> str:
+        q_from, q_to = quote(from_address), quote(to_address)
+        return f"https://yandex.ru/maps/?rtext={q_from}~{q_to}&rtt=auto"
+
+    def proxy_map_url(self, from_geo: dict, to_geo: dict) -> str:
+        """Превью через наш API (обход блокировок static OSM в WebView)."""
+        base = settings.public_api_base.rstrip("/")
+        return (
+            f"{base}/dashboard/map-preview?"
+            f"fl={from_geo['lat']}&fo={from_geo['lon']}"
+            f"&tl={to_geo['lat']}&tol={to_geo['lon']}"
+        )
+
+    def _static_map_remote_urls(self, from_geo: dict, to_geo: dict) -> list[str]:
+        lat1, lon1 = from_geo["lat"], from_geo["lon"]
+        lat2, lon2 = to_geo["lat"], to_geo["lon"]
+        center_lat = (lat1 + lat2) / 2
+        center_lon = (lon1 + lon2) / 2
+        zoom = 5 if abs(lat1 - lat2) > 2 or abs(lon1 - lon2) > 2 else 10
+
+        urls: list[str] = []
+
+        if settings.yandex_maps_api_key:
+            pt = f"{lon1},{lat1},pm2rdm~{lon2},{lat2},pm2blm"
+            urls.append(
+                f"https://static-maps.yandex.ru/1.x/?l=map&pt={quote(pt)}"
+                f"&size=450,300&z={zoom}&ll={center_lon},{center_lat}"
+                f"&apikey={settings.yandex_maps_api_key}"
+            )
+
+        urls.append(
+            "https://staticmap.openstreetmap.fr/staticmap.php?"
+            f"center={center_lat},{center_lon}&zoom={zoom}&size=450x300&maptype=mapnik"
+            f"&markers={lat1},{lon1},red|{lat2},{lon2},blue"
+        )
+        return urls
+
+    async def fetch_static_preview(
+        self, lat1: float, lon1: float, lat2: float, lon2: float
+    ) -> tuple[bytes, str]:
+        """Скачать картинку маршрута (кэш Redis)."""
+        cache_key = f"mapimg:{hashlib.md5(f'{lat1},{lon1},{lat2},{lon2}'.encode()).hexdigest()}"
+        if cached := await cache_get(cache_key):
+            if isinstance(cached, dict) and cached.get("body_b64"):
+                return base64.b64decode(cached["body_b64"]), cached.get("ctype", "image/png")
+
+        from_geo = {"lat": lat1, "lon": lon1}
+        to_geo = {"lat": lat2, "lon": lon2}
+        headers = {"User-Agent": "NavigAI/1.0"}
+
+        for url in self._static_map_remote_urls(from_geo, to_geo):
+            try:
+                async with httpx.AsyncClient(timeout=12.0, headers=headers, follow_redirects=True) as client:
+                    resp = await client.get(url)
+                    ctype = resp.headers.get("content-type", "")
+                    if resp.status_code == 200 and "image" in ctype and len(resp.content) > 500:
+                        await cache_set(
+                            cache_key,
+                            {
+                                "body_b64": base64.b64encode(resp.content).decode("ascii"),
+                                "ctype": ctype,
+                            },
+                            ttl=settings.cache_ttl_seconds,
+                        )
+                        return resp.content, ctype
+            except Exception as exc:
+                logger.warning("Static map fetch failed %s: %s", url[:60], exc)
+
+        raise RuntimeError("static map unavailable")
+
     async def route(
         self,
         from_address: str,
@@ -73,7 +150,7 @@ class OsrmMapsService:
         for base in bases:
             url = f"{base}/route/v1/{profile}/{coords}"
             try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with httpx.AsyncClient(timeout=20.0) as client:
                     resp = await client.get(url, params={"overview": "false", "steps": "false"})
                     if resp.status_code == 200:
                         data = resp.json()
@@ -87,45 +164,25 @@ class OsrmMapsService:
             except Exception as exc:
                 logger.warning("OSRM %s error: %s", base, exc)
 
-        maps_url = self._maps_link(from_geo, to_geo)
-        static_map = self._static_map_url(from_geo, to_geo)
-
         result = {
             "from_address": from_geo["address"],
             "to_address": to_geo["address"],
             "duration_minutes": duration_minutes,
             "distance_km": distance_km,
             "traffic_level": "normal",
-            "static_map_url": static_map,
-            "yandex_maps_url": maps_url,  # поле в БД: ссылка «открыть маршрут»
-            "route_data": {"provider": "osrm", "mode": mode},
+            "static_map_url": self.proxy_map_url(from_geo, to_geo),
+            "yandex_maps_url": self.yandex_maps_link(from_geo, to_geo),
+            "route_data": {
+                "provider": "osrm",
+                "mode": mode,
+                "from": {"lat": from_geo["lat"], "lon": from_geo["lon"]},
+                "to": {"lat": to_geo["lat"], "lon": to_geo["lon"]},
+            },
         }
         await cache_set(cache_key, result, ttl=settings.cache_ttl_seconds)
         return result
 
-    def _static_map_url(self, from_geo: dict, to_geo: dict) -> str:
-        """Статическая карта OSM (без API-ключа)."""
-        lat1, lon1 = from_geo["lat"], from_geo["lon"]
-        lat2, lon2 = to_geo["lat"], to_geo["lon"]
-        center_lat = (lat1 + lat2) / 2
-        center_lon = (lon1 + lon2) / 2
-        return (
-            "https://staticmap.openstreetmap.de/staticmap.php?"
-            f"center={center_lat},{center_lon}&zoom=12&size=450x300&maptype=mapnik"
-            f"&markers={lat1},{lon1},red-pushpin|{lat2},{lon2},blue-pushpin"
-        )
-
-    def _maps_link(self, from_geo: dict, to_geo: dict) -> str:
-        """Ссылка на маршрут (Google Maps — без ключа)."""
-        return (
-            "https://www.google.com/maps/dir/?api=1"
-            f"&origin={from_geo['lat']},{from_geo['lon']}"
-            f"&destination={to_geo['lat']},{to_geo['lon']}"
-            "&travelmode=driving"
-        )
-
     def _link_only(self, from_address: str, to_address: str, mode: str, reason: str = "") -> dict[str, Any]:
-        q_from, q_to = quote(from_address), quote(to_address)
         return {
             "from_address": from_address,
             "to_address": to_address,
@@ -133,9 +190,7 @@ class OsrmMapsService:
             "distance_km": 8.0,
             "traffic_level": "unknown",
             "static_map_url": "",
-            "yandex_maps_url": (
-                f"https://www.google.com/maps/dir/?api=1&origin={q_from}&destination={q_to}"
-            ),
+            "yandex_maps_url": self.yandex_maps_link_text(from_address, to_address),
             "route_data": {"provider": "link_only", "mode": mode, "reason": reason},
         }
 

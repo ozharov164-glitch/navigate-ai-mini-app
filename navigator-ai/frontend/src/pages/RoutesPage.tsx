@@ -2,6 +2,7 @@ import { Clock, ExternalLink, MapPin, TrafficCone } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Route } from "@/lib/api";
 import { RouteProviderBadge } from "@/components/RouteProviderBadge";
+import { RouteMapPreview } from "@/components/RouteMapPreview";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
@@ -55,12 +56,7 @@ export function RoutesPage({ routes }: Props) {
             >
               {r.static_map_url ? (
                 <>
-                  <img
-                    src={r.static_map_url}
-                    alt=""
-                    className="h-44 w-full object-cover"
-                    loading="lazy"
-                  />
+                  <RouteMapPreview url={r.static_map_url} />
                   <motion.div
                     className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent"
                     initial={{ opacity: 0 }}
@@ -130,7 +126,7 @@ export function RoutesPage({ routes }: Props) {
                   className="btn-primary mt-4 inline-flex items-center gap-2 !py-2 text-xs"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Открыть маршрут
+                  Открыть в Яндекс.Картах
                 </motion.a>
               )}
             </motion.div>
