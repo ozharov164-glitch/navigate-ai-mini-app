@@ -95,18 +95,48 @@ class PlaceOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AchievementOut(BaseModel):
+    id: str
+    title: str
+    description: str
+    unlocked: bool
+
+
+class GamificationOut(BaseModel):
+    streak: int
+    level: int
+    xp: int
+    xp_in_level: int
+    xp_to_next: int
+    achievements: list[AchievementOut]
+    tasks_completed: int = 0
+    ai_actions_total: int = 0
+
+
+class DbInsightOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    icon: str
+
+
 class DashboardOut(BaseModel):
     tasks_today: list[TaskOut]
     expenses_month: list[ExpenseOut]
     routes_recent: list[RouteOut]
     insights: list[InsightOut]
+    db_insights: list[DbInsightOut] = Field(default_factory=list)
+    gamification: GamificationOut | None = None
     summary_latest: str | None
     saved_minutes_today: int
     saved_rub_today: int
     tier: str
     daily_actions_left: int
+    daily_actions_limit: int
+    daily_actions_used: int
     is_premium: bool
     theme: str = "dark"
+    route_provider: str = "auto"
 
 
 class AnalyzeIn(BaseModel):
@@ -127,3 +157,4 @@ class UserSettingsUpdate(BaseModel):
     theme: str | None = None
     timezone: str | None = None
     proactive_enabled: bool | None = None
+    route_provider: str | None = None  # auto | yandex | osrm

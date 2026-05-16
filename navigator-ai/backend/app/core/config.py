@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ai_max_tokens: int = 2048
     ai_cache_ttl: int = 3600
     ai_json_retries: int = 2
-    ai_json_retries_premium: int = 3
+    ai_json_retries_premium: int = 1
     # Режим экономии: один vision на фото, без LLM в вечернем дайджесте, короткие fallback-цепочки
     ai_budget_mode: bool = True
     ai_worker_evening_llm: bool = False
@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     yandex_geocoder_url: str = "https://geocode-maps.yandex.ru/1.x/"
     yandex_router_url: str = "https://api.routing.yandex.net/v2/route"
     yandex_static_map_url: str = "https://static-maps.yandex.ru/1.x/"
+    yandex_daily_limit: int = 800
+    yandex_static_map_enabled: bool = True
+    osrm_base_url: str = "https://router.project-osrm.org"
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
 
     stars_basic_price: int = 199
     stars_premium_price: int = 399
@@ -67,7 +71,8 @@ class Settings(BaseSettings):
     yookassa_basic_price_rub: int = 199
     yookassa_premium_price_rub: int = 399
 
-    free_daily_actions: int = 20
+    free_daily_actions: int = 10
+    premium_daily_actions: int = 50  # 0 = без soft-cap (не рекомендуется)
     referral_bonus_days: int = 14
 
     morning_digest_hour: int = 8

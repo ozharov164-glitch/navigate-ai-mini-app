@@ -5,6 +5,7 @@ import {
   FileText,
   History,
   MapPinned,
+  Navigation,
   Moon,
   Shield,
   Sparkles,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   isPremium: boolean;
+  routeProvider?: "auto" | "yandex" | "osrm";
   onTheme: () => void;
   theme?: "dark" | "light";
   scrollTo?: "premium" | "privacy" | null;
@@ -50,7 +52,20 @@ function SettingsSection({
   );
 }
 
-export function MorePage({ isPremium, onTheme, theme = "dark", scrollTo, onRefresh }: Props) {
+const ROUTE_OPTIONS: { id: "auto" | "yandex" | "osrm"; title: string; desc: string }[] = [
+  { id: "auto", title: "Авто", desc: "Яндекс при наличии ключа, иначе OSRM" },
+  { id: "yandex", title: "Яндекс", desc: "Пробки и точное время (нужен API-ключ)" },
+  { id: "osrm", title: "Эконом OSRM", desc: "Бесплатно, без лимитов Яндекса" },
+];
+
+export function MorePage({
+  isPremium,
+  routeProvider = "auto",
+  onTheme,
+  theme = "dark",
+  scrollTo,
+  onRefresh,
+}: Props) {
   const { showToast } = useToast();
   const premiumRef = useRef<HTMLElement>(null);
   const privacyRef = useRef<HTMLElement>(null);
@@ -62,6 +77,22 @@ export function MorePage({ isPremium, onTheme, theme = "dark", scrollTo, onRefre
   const [placeAddr, setPlaceAddr] = useState("");
   const [payBusy, setPayBusy] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [route, setRoute] = useState(routeProvider);
+
+  useEffect(() => setRoute(routeProvider), [routeProvider]);
+
+  const saveRoute = async (p: "auto" | "yandex" | "osrm") => {
+    setRoute(p);
+    try {
+      await api.updateSettings({ route_provider: p });
+      showToast(
+        p === "yandex" ? "Маршруты: Яндекс (пробки)" : p === "osrm" ? "Маршруты: эконом OSRM" : "Маршруты: авто",
+        "success"
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Ошибка", "error");
+    }
+  };
 
   useEffect(() => {
     api.privacy().then(setPrivacy).catch(() => showToast("Не удалось загрузить приватность", "error"));
@@ -212,6 +243,28 @@ export function MorePage({ isPremium, onTheme, theme = "dark", scrollTo, onRefre
           </button>
         </div>
       </section>
+
+      <SettingsSection title="Маршруты" icon={Navigation}>
+        <p className="mb-3 text-xs text-muted">Как строить маршруты в боте</p>
+        <div className="space-y-2">
+          {ROUTE_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => saveRoute(o.id)}
+              className={cn(
+                "w-full rounded-xl border p-3 text-left transition active:scale-[0.99]",
+                route === o.id
+                  ? "border-accent/40 bg-cyan-400/10"
+                  : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+              )}
+            >
+              <p className="text-sm font-medium text-primary">{o.title}</p>
+              <p className="text-[10px] text-muted">{o.desc}</p>
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
 
       <SettingsSection title="Мои места" icon={MapPinned}>
         <p className="mb-3 text-xs text-muted">Дом, работа, дача — для быстрых маршрутов</p>

@@ -6,6 +6,8 @@ from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("FREE_DAILY_ACTIONS", "10")
+os.environ.setdefault("PREMIUM_DAILY_ACTIONS", "50")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")

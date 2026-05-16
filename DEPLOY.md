@@ -53,6 +53,26 @@ docker compose -f navigator-ai/docker-compose.yml up -d postgres redis backend
 cd navigator-ai && python -m bot.main
 ```
 
+## Миграции после обновления backend
+
+На VPS внутри контейнера или с хоста:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+Миграция `002_gamification_routing`: streak, XP, `route_provider`, soft-cap premium.
+
+Обновите `.env.production`:
+
+```env
+FREE_DAILY_ACTIONS=10
+PREMIUM_DAILY_ACTIONS=50
+AI_JSON_RETRIES_PREMIUM=1
+YANDEX_DAILY_LIMIT=800
+OSRM_BASE_URL=https://router.project-osrm.org
+```
+
 ## Тесты перед деплоем
 
 ```bash

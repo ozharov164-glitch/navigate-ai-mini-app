@@ -37,7 +37,7 @@ export default function App() {
       const next = resolveInitialTheme(d.theme);
       setTheme(next);
       applyTheme(next);
-      setStreak(updateVisitStreak());
+      setStreak(d.gamification?.streak ?? updateVisitStreak());
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ошибка загрузки";
       setError(msg === "Load failed" || msg === "Failed to fetch" ? "Нет связи с сервером" : msg);
@@ -78,7 +78,7 @@ export default function App() {
     setTheme(next);
     applyTheme(next);
     try {
-      await api.updateSettings(next);
+      await api.updateSettings({ theme: next });
     } catch {
       /* best effort */
     }
@@ -134,7 +134,10 @@ export default function App() {
           rub={data.saved_rub_today}
           premium={data.is_premium}
           left={data.daily_actions_left}
-          streak={streak}
+          limit={data.daily_actions_limit}
+          used={data.daily_actions_used}
+          streak={data.gamification?.streak ?? streak}
+          level={data.gamification?.level ?? 1}
           onUpgrade={goPremium}
         />
       )}
@@ -159,6 +162,7 @@ export default function App() {
           {tab === "more" && (
             <MorePage
               isPremium={data?.is_premium ?? false}
+              routeProvider={data?.route_provider ?? "auto"}
               onTheme={toggleTheme}
               theme={theme}
               scrollTo={moreScroll}

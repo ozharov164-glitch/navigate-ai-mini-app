@@ -41,18 +41,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+}
+
+export interface Gamification {
+  streak: number;
+  level: number;
+  xp: number;
+  xp_in_level: number;
+  xp_to_next: number;
+  achievements: Achievement[];
+  tasks_completed: number;
+  ai_actions_total: number;
+}
+
+export interface DbInsight {
+  id: string;
+  title: string;
+  body: string;
+  icon: string;
+}
+
 export interface Dashboard {
   tasks_today: Task[];
   expenses_month: Expense[];
   routes_recent: Route[];
   insights: Insight[];
+  db_insights: DbInsight[];
+  gamification: Gamification | null;
   summary_latest: string | null;
   saved_minutes_today: number;
   saved_rub_today: number;
   tier: string;
   daily_actions_left: number;
+  daily_actions_limit: number;
+  daily_actions_used: number;
   is_premium: boolean;
   theme: "dark" | "light";
+  route_provider: "auto" | "yandex" | "osrm";
 }
 
 export interface AnalyzeResult {
@@ -151,8 +181,8 @@ export const api = {
     request("/dashboard/places", { method: "POST", body: JSON.stringify({ name, address }) }),
   privacy: () => request<{ stored_items: string[]; retention_policy: string; encryption: string }>("/dashboard/privacy"),
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
-  updateSettings: (theme: string) =>
-    request("/dashboard/settings", { method: "PATCH", body: JSON.stringify({ theme }) }),
+  updateSettings: (payload: { theme?: string; route_provider?: string }) =>
+    request("/dashboard/settings", { method: "PATCH", body: JSON.stringify(payload) }),
   /** Скачивание файла экспорта с авторизацией initData */
   downloadExport: async (path: "/export/ical" | "/export/pdf", filename: string) => {
     const initData = getInitData();

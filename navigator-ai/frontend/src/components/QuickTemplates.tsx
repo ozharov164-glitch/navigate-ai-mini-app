@@ -43,14 +43,15 @@ const prompts: Record<string, string> = {
 
 interface Props {
   onDone: () => void;
+  busy?: boolean;
 }
 
-export function QuickTemplates({ onDone }: Props) {
+export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
   const { showToast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
 
   const run = async (template: string) => {
-    if (busy) return;
+    if (busy || externalBusy) return;
     hapticLight();
     setBusy(template);
     try {
@@ -73,7 +74,7 @@ export function QuickTemplates({ onDone }: Props) {
           <button
             key={t.id}
             type="button"
-            disabled={!!busy}
+            disabled={!!busy || externalBusy}
             onClick={() => run(t.template)}
             className={cn(
               "glass-card-interactive flex items-start gap-3 p-3 text-left disabled:opacity-60",

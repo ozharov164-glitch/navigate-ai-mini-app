@@ -26,7 +26,7 @@ class ContextBuilder:
                 select(Task)
                 .where(Task.user_id == user.id, Task.completed.is_(False))
                 .order_by(Task.due_date.nulls_last(), Task.created_at.desc())
-                .limit(30)
+                .limit(5)
             )
         ).scalars().all()
 
@@ -69,13 +69,17 @@ class ContextBuilder:
         for e in expenses:
             by_cat[e.category] = by_cat.get(e.category, 0) + e.amount
 
-        cat_lines = [f"  - {k}: {v:.0f} ₽" for k, v in sorted(by_cat.items(), key=lambda x: -x[1])[:8]]
+        cat_lines = [f"  - {k}: {v:.0f} ₽" for k, v in sorted(by_cat.items(), key=lambda x: -x[1])[:5]]
+        task_lines = []
+        for t in sorted(tasks, key=lambda x: x.created_at or datetime.now(timezone.utc), reverse=True)[:5]:
+            task_lines.append(f"- {'✓' if t.completed else '○'} {t.title}")
 
         return (
             f"Анализ за 7 дней (с {week_ago.date().isoformat()}):\n"
             f"Задач создано: {len(tasks)}, выполнено: {completed}\n"
+            f"Топ задач:\n" + ("\n".join(task_lines) if task_lines else "  (нет)") + "\n"
             f"Расходов: {len(expenses)}, сумма: {total_exp:.0f} ₽\n"
-            f"По категориям:\n" + ("\n".join(cat_lines) if cat_lines else "  (нет расходов)") + "\n"
+            f"Топ категорий:\n" + ("\n".join(cat_lines) if cat_lines else "  (нет расходов)") + "\n"
             f"Метрики сегодня: {user.saved_minutes_today} мин, {user.saved_rub_today} ₽."
         )
 

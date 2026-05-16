@@ -16,7 +16,7 @@ from backend.app.schemas.ai import AIAnalysisResponse
 from backend.app.services.ai_service import ai_service
 from backend.app.services.context_builder import context_builder
 from backend.app.services.user_service import user_service
-from backend.app.services.yandex_maps import yandex_maps
+from backend.app.services.routing_service import routing_service
 from backend.app.models.user import User
 
 
@@ -89,8 +89,12 @@ class ActionProcessor:
           )
       for r in data.routes:
           try:
-              route_info = await yandex_maps.route(r.from_address, r.to_address, r.transport_mode)
+              route_info = await routing_service.route(
+                  user, r.from_address, r.to_address, r.transport_mode
+              )
           except Exception:
+              from backend.app.services.yandex_maps import yandex_maps
+
               route_info = yandex_maps._fallback_route(r.from_address, r.to_address, r.transport_mode)
           session.add(
               Route(

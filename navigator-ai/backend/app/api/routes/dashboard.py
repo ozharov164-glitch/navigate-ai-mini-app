@@ -23,8 +23,11 @@ from backend.app.models.user import User, UserPlace
 from backend.app.schemas.dashboard import (
     AnalyzeIn,
     DashboardOut,
+    DbInsightOut,
     DocumentOut,
     ExpenseOut,
+    GamificationOut,
+    AchievementOut,
     InsightOut,
     PlaceIn,
     PlaceOut,
@@ -35,6 +38,8 @@ from backend.app.schemas.dashboard import (
     TaskUpdate,
     UserSettingsUpdate,
 )
+from backend.app.services.gamification_service import gamification_service
+from backend.app.services.product_insights_service import product_insights_service
 from backend.app.core.uploads import read_upload_limited
 from backend.app.services.action_processor import action_processor
 from backend.app.services.user_service import user_service
@@ -91,20 +96,39 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
     ).scalar_one_or_none()
 
     is_premium = user_service.is_premium(user)
-    left = max(0, settings.free_daily_actions - user.daily_actions_count) if not is_premium else 999
+    limit = user_service.daily_limit(user)
+    used = user_service.daily_actions_used(user)
+    left = user_service.daily_actions_left(user)
+
+    g = await gamification_service.build_profile(db, user)
+    db_insights = await product_insights_service.build(db, user)
 
     return DashboardOut(
         tasks_today=[TaskOut.model_validate(t) for t in tasks],
         expenses_month=[ExpenseOut.model_validate(e) for e in expenses],
         routes_recent=[RouteOut.model_validate(r) for r in routes],
         insights=[InsightOut.model_validate(i) for i in insights],
+        db_insights=[DbInsightOut.model_validate(i) for i in db_insights],
+        gamification=GamificationOut(
+            streak=g["streak"],
+            level=g["level"],
+            xp=g["xp"],
+            xp_in_level=g["xp_in_level"],
+            xp_to_next=g["xp_to_next"],
+            achievements=[AchievementOut.model_validate(a) for a in g["achievements"]],
+            tasks_completed=g["tasks_completed"],
+            ai_actions_total=g["ai_actions_total"],
+        ),
         summary_latest=last_log.raw_summary if last_log else None,
         saved_minutes_today=user.saved_minutes_today,
         saved_rub_today=user.saved_rub_today,
         tier=user.tier,
         daily_actions_left=left,
+        daily_actions_limit=limit,
+        daily_actions_used=used,
         is_premium=is_premium,
         theme=user.theme or "dark",
+        route_provider=user.route_provider or "auto",
     )
 
 
@@ -115,7 +139,7 @@ async def analyze_text(
     db: AsyncSession = Depends(get_db),
 ):
     if not await user_service.check_daily_limit(db, user):
-        raise HTTPException(429, "Лимит 20 действий в сутки. Оформите премиум.")
+        raise HTTPException(429, user_service.limit_message(user))
     try:
         return await action_processor.process_message(
             db, user, text=body.text, template=body.template,
@@ -132,7 +156,7 @@ async def analyze_voice(
     db: AsyncSession = Depends(get_db),
 ):
     if not await user_service.check_daily_limit(db, user):
-        raise HTTPException(429, "Лимит 20 действий в сутки. Оформите премиум.")
+        raise HTTPException(429, user_service.limit_message(user))
     content, filename = await read_upload_limited(file, kind="audio")
     try:
         from backend.app.services.ai_service import ai_service
@@ -156,7 +180,10 @@ async def update_task(
     if not task:
         raise HTTPException(404, "Задача не найдена")
     if body.completed is not None:
+        was_done = task.completed
         task.completed = body.completed
+        if body.completed and not was_done:
+            gamification_service.add_task_xp(user)
     if body.title:
         task.title = body.title
     return TaskOut.model_validate(task)
@@ -243,7 +270,13 @@ async def update_settings(body: UserSettingsUpdate, user: User = Depends(get_cur
         user.timezone = body.timezone
     if body.proactive_enabled is not None:
         user.proactive_enabled = body.proactive_enabled
-    return {"ok": True, "theme": user.theme}
+    if body.route_provider in ("auto", "yandex", "osrm"):
+        user.route_provider = body.route_provider
+    return {
+        "ok": True,
+        "theme": user.theme,
+        "route_provider": user.route_provider or "auto",
+    }
 
 
 @router.get("/privacy", response_model=PrivacyInfo)

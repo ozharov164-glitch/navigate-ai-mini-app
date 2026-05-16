@@ -1,5 +1,8 @@
 """Задачи, расходы, маршруты, напоминания и vault."""
+from __future__ import annotations
+
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy import JSON
@@ -14,11 +17,11 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(500))
-    description: Mapped[str | None] = mapped_column(Text)
-    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
-    source_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -30,10 +33,10 @@ class Expense(Base):
     amount: Mapped[float] = mapped_column(Float)
     currency: Mapped[str] = mapped_column(String(3), default="RUB")
     category: Mapped[str] = mapped_column(String(100))
-    merchant: Mapped[str | None] = mapped_column(String(255))
-    description: Mapped[str | None] = mapped_column(Text)
+    merchant: Mapped[str] = mapped_column(String(255), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
     expense_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
-    receipt_path: Mapped[str | None] = mapped_column(String(500))
+    receipt_path: Mapped[str] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -45,12 +48,12 @@ class Route(Base):
     from_address: Mapped[str] = mapped_column(String(500))
     to_address: Mapped[str] = mapped_column(String(500))
     transport_mode: Mapped[str] = mapped_column(String(20), default="auto")
-    duration_minutes: Mapped[int | None] = mapped_column(Integer)
-    distance_km: Mapped[float | None] = mapped_column(Float)
-    traffic_level: Mapped[str | None] = mapped_column(String(50))
-    static_map_url: Mapped[str | None] = mapped_column(Text)
-    yandex_maps_url: Mapped[str | None] = mapped_column(Text)
-    route_data: Mapped[dict | None] = mapped_column(JSON)
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=True)
+    distance_km: Mapped[float] = mapped_column(Float, nullable=True)
+    traffic_level: Mapped[str] = mapped_column(String(50), nullable=True)
+    static_map_url: Mapped[str] = mapped_column(Text, nullable=True)
+    yandex_maps_url: Mapped[str] = mapped_column(Text, nullable=True)
+    route_data: Mapped[dict] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -62,7 +65,7 @@ class Reminder(Base):
     title: Mapped[str] = mapped_column(String(500))
     remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent: Mapped[bool] = mapped_column(Boolean, default=False)
-    document_id: Mapped[int | None] = mapped_column(ForeignKey("document_vault.id", ondelete="SET NULL"))
+    document_id: Mapped[int] = mapped_column(ForeignKey("document_vault.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -73,7 +76,7 @@ class Digest(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     digest_type: Mapped[str] = mapped_column(String(20))  # morning, evening, weekly
     content: Mapped[str] = mapped_column(Text)
-    insights: Mapped[list | None] = mapped_column(JSON)
+    insights: Mapped[list] = mapped_column(JSON, nullable=True)
     digest_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -86,8 +89,8 @@ class DocumentVault(Base):
     title: Mapped[str] = mapped_column(String(255))
     doc_type: Mapped[str] = mapped_column(String(50))  # policy, ticket, receipt, other
     file_path: Mapped[str] = mapped_column(String(500))
-    expiry_date: Mapped[date | None] = mapped_column(Date)
-    notes_encrypted: Mapped[str | None] = mapped_column(Text)
+    expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
+    notes_encrypted: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -109,6 +112,6 @@ class ActionLog(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     action_type: Mapped[str] = mapped_column(String(50))
     input_type: Mapped[str] = mapped_column(String(20))  # voice, photo, text, location
-    raw_summary: Mapped[str | None] = mapped_column(Text)
-    ai_response: Mapped[dict | None] = mapped_column(JSON)
+    raw_summary: Mapped[str] = mapped_column(Text, nullable=True)
+    ai_response: Mapped[dict] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

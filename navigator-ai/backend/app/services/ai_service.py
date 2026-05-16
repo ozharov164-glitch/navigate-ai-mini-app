@@ -81,7 +81,8 @@ def _vision_models() -> tuple[str, ...]:
 
 
 def _json_retries(is_premium: bool) -> int:
-    if settings.ai_budget_mode and not is_premium:
+    # В budget mode — одна попытка для всех (меньше расхода OpenRouter)
+    if settings.ai_budget_mode:
         return 1
     return settings.ai_json_retries_premium if is_premium else settings.ai_json_retries
 

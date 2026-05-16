@@ -62,11 +62,23 @@ black --check backend bot tests
 
 ## Функции
 
-- DeepSeek V3.2 + fallback-модели (транскрипция, vision)
-- Контекст из БД для шаблонов day_plan / week_analysis
-- Yandex Maps, freemium 20/день, Stars + YooKassa
-- Rate limit, валидация upload, JSON-ответы с Pydantic retry
-- Proactive digests, Fernet для адресов, экспорт iCal/PDF
+- DeepSeek V3.2 + Gemini (голос/фото), `AI_BUDGET_MODE` и Redis-кэш
+- **Лимиты:** free 10 AI/день, premium soft-cap 50/день (настраивается env)
+- Шаблоны day_plan / week_analysis — короткий контекст (top-5 из БД)
+- **Маршруты:** Яндекс (пробки) или **OSRM** (эконом), переключатель в Mini App
+- Геймификация: streak, XP, уровень, достижения; insights только из БД (без LLM)
+- Yandex daily cap + fallback при 403/429; Stars + YooKassa
+- Mini App: premium UI, «Умный день», шаринг карточки, confetti
+
+После деплоя backend: `alembic upgrade head` (миграция `002_gamification_routing`).
+
+## OpenRouter
+
+Рекомендуется выставить **monthly cap $25–30** в кабинете OpenRouter. На VPS смотреть токены:
+
+```bash
+docker compose -f docker-compose.prod.yml logs backend | grep -i openrouter
+```
 
 ## Приватность
 

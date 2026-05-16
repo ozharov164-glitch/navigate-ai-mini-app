@@ -59,7 +59,8 @@ async def ensure_user(body: BotUserEnsure, db: AsyncSession = Depends(get_db), _
         "user_id": user.id,
         "referral_code": user.referral_code,
         "is_premium": user_service.is_premium(user),
-        "daily_left": max(0, settings.free_daily_actions - user.daily_actions_count),
+        "daily_left": user_service.daily_actions_left(user),
+        "daily_limit": user_service.daily_limit(user),
         "referral_applied": referral_applied,
     }
 
@@ -103,7 +104,7 @@ async def process_message(
         await user_service.apply_referral(db, user, referral_code)
 
     if not await user_service.check_daily_limit(db, user):
-        raise HTTPException(429, "Дневной лимит исчерпан. Откройте Mini App для премиум.")
+        raise HTTPException(429, user_service.limit_message(user))
 
     voice_transcript = None
     photo_description = None
