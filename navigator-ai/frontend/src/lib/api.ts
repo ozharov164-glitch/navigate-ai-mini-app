@@ -174,8 +174,17 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
+  expenses: () => request<Expense[]>("/dashboard/expenses"),
   starsInvoice: (tier: string) =>
-    request("/payments/stars-invoice", { method: "POST", body: JSON.stringify({ tier }) }),
+    request<{ invoice_url: string }>("/payments/stars-invoice", { method: "POST", body: JSON.stringify({ tier }) }),
   yookassa: (tier: string) =>
-    request<{ confirmation_url: string }>("/payments/yookassa", { method: "POST", body: JSON.stringify({ tier }) }),
+    request<{ confirmation_url: string; payment_id: string }>("/payments/yookassa", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  confirmYookassa: (tier: string, paymentId: string) =>
+    request<{ ok: boolean }>("/payments/confirm", {
+      method: "POST",
+      body: JSON.stringify({ tier, payment_id: paymentId }),
+    }),
 };

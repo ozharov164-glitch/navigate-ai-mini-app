@@ -1,6 +1,7 @@
 import { Mic, Square } from "lucide-react";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 import { hapticLight } from "@/lib/telegram";
 
 interface Props {
@@ -16,6 +17,7 @@ function pickMimeType(): string {
 }
 
 export function VoiceFab({ onDone }: Props) {
+  const { showToast } = useToast();
   const [recording, setRecording] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -30,7 +32,7 @@ export function VoiceFab({ onDone }: Props) {
   const startRecording = async () => {
     hapticLight();
     if (!navigator.mediaDevices?.getUserMedia) {
-      setStatus("Отправьте голосовое боту @NavigAI_bot");
+      showToast("Отправьте голосовое боту @NavigAI_bot", "info");
       return;
     }
     try {
@@ -49,13 +51,13 @@ export function VoiceFab({ onDone }: Props) {
         setStatus("Анализирую…");
         try {
           const result = await api.analyzeVoice(blob, `voice.${ext}`);
-          setStatus(result.summary?.slice(0, 80) || "Готово!");
+          showToast(result.summary?.slice(0, 100) || "Готово!", "success");
           await onDone();
         } catch (err) {
-          setStatus(err instanceof Error ? err.message : "Ошибка");
+          showToast(err instanceof Error ? err.message : "Ошибка распознавания", "error");
         } finally {
           setRecording(false);
-          setTimeout(() => setStatus(null), 3500);
+          setStatus(null);
         }
       };
       recorderRef.current = recorder;
@@ -64,7 +66,7 @@ export function VoiceFab({ onDone }: Props) {
       setStatus("Запись… Нажмите ещё раз, чтобы отправить");
     } catch {
       stopStream();
-      setStatus("Нет доступа к микрофону. Голосовое — боту @NavigAI_bot");
+      showToast("Нет доступа к микрофону. Голосовое — боту @NavigAI_bot", "error");
     }
   };
 
@@ -82,17 +84,17 @@ export function VoiceFab({ onDone }: Props) {
   return (
     <>
       {status && (
-        <div className="fixed bottom-24 left-1/2 z-40 max-w-[90%] -translate-x-1/2 rounded-xl bg-slate-800/95 px-4 py-2 text-center text-xs shadow-lg">
+        <div className="voice-status fixed bottom-28 left-1/2 z-40 max-w-[90%] -translate-x-1/2 rounded-xl px-4 py-2 text-center text-xs shadow-lg">
           {status}
         </div>
       )}
       <button
         type="button"
         onClick={handleClick}
-        className={`fixed bottom-20 left-1/2 z-40 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-indigo-400/40 bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/40 transition ${recording ? "scale-110 animate-pulse ring-2 ring-red-400" : "hover:scale-105"}`}
+        className={`voice-fab fixed bottom-[5.5rem] left-1/2 z-40 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full border border-indigo-400/40 bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/40 transition ${recording ? "scale-110 animate-pulse ring-2 ring-red-400" : "hover:scale-105"}`}
         aria-label={recording ? "Остановить запись" : "Голосовой ввод"}
       >
-        {recording ? <Square className="h-6 w-6 text-white" /> : <Mic className="h-7 w-7 text-white" />}
+        {recording ? <Square className="h-5 w-5 text-white" /> : <Mic className="h-6 w-6 text-white" />}
       </button>
     </>
   );

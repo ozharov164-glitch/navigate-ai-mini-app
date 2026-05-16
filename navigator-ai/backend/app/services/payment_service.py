@@ -23,6 +23,27 @@ class PaymentService:
             "prices": [{"label": "Подписка", "amount": price}],
         }
 
+    async def create_stars_invoice_link(self, tier: str, user_id: int) -> str | None:
+        """Создаёт ссылку на invoice для Telegram.WebApp.openInvoice."""
+        if not settings.bot_token:
+            return None
+        payload = self.stars_invoice_payload(tier, user_id)
+        body = {
+            "title": payload["title"],
+            "description": payload["description"],
+            "payload": payload["payload"],
+            "currency": payload["currency"],
+            "prices": payload["prices"],
+        }
+        url = f"https://api.telegram.org/bot{settings.bot_token}/createInvoiceLink"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(url, json=body)
+            data = resp.json()
+            if data.get("ok") and data.get("result"):
+                return str(data["result"])
+            logger.warning("createInvoiceLink failed: %s", data.get("description"))
+        return None
+
     async def create_yookassa_payment(self, tier: str, user_id: int) -> dict[str, Any] | None:
         if not settings.yookassa_shop_id or not settings.yookassa_secret_key:
             return None

@@ -47,4 +47,112 @@
   html.light .text-muted {
     @apply text-slate-600;
   }
+
+  .text-primary {
+    @apply text-slate-100;
+  }
+  html.light .text-primary {
+    @apply text-slate-900;
+  }
+
+  .text-secondary {
+    @apply text-slate-300;
+  }
+  html.light .text-secondary {
+    @apply text-slate-600;
+  }
+
+  .text-accent {
+    @apply text-indigo-300;
+  }
+  html.light .text-accent {
+    @apply text-indigo-600;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400/50 focus:outline-none;
+  }
+  html.light .input-field {
+    @apply border-slate-300 bg-white text-slate-900 placeholder:text-slate-400;
+  }
+
+  .toast-banner {
+    @apply fixed left-1/2 top-4 z-[100] max-w-[92%] -translate-x-1/2 rounded-xl border px-4 py-3 text-sm shadow-xl backdrop-blur-md animate-slide-up;
+  }
+  .toast-info {
+    @apply border-indigo-500/40 bg-slate-900/95 text-indigo-100;
+  }
+  html.light .toast-info {
+    @apply border-indigo-300 bg-white text-indigo-800;
+  }
+  .toast-success {
+    @apply border-emerald-500/40 bg-emerald-950/90 text-emerald-100;
+  }
+  html.light .toast-success {
+    @apply border-emerald-300 bg-emerald-50 text-emerald-800;
+  }
+  .toast-error {
+    @apply border-red-500/40 bg-red-950/90 text-red-100;
+  }
+  html.light .toast-error {
+    @apply border-red-300 bg-red-50 text-red-800;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm;
+  }
+  html.light .modal-overlay {
+    @apply bg-slate-900/30;
+  }
+
+  .modal-panel {
+    @apply w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl;
+  }
+  html.light .modal-panel {
+    @apply border-slate-200 bg-white;
+  }
+
+  .modal-title {
+    @apply text-lg font-semibold text-slate-100;
+  }
+  html.light .modal-title {
+    @apply text-slate-900;
+  }
+
+  .modal-message {
+    @apply mt-2 text-sm text-slate-300;
+  }
+  html.light .modal-message {
+    @apply text-slate-600;
+  }
+
+  .modal-actions {
+    @apply mt-5 flex gap-2;
+  }
+
+  .modal-btn-primary {
+    @apply border-indigo-500/50 bg-indigo-600/80 text-white hover:bg-indigo-500;
+  }
+
+  .modal-btn-danger {
+    @apply border-red-500/50 bg-red-600/80 text-white hover:bg-red-500;
+  }
+
+  html.light .bottom-nav {
+    @apply border-slate-200 bg-white/95;
+  }
+
+  .insight-card {
+    @apply bg-amber-500/10 text-amber-100/90;
+  }
+  html.light .insight-card {
+    @apply bg-amber-50 text-amber-900;
+  }
+
+  .voice-status {
+    @apply border border-white/10 bg-slate-800/95 text-slate-200;
+  }
+  html.light .voice-status {
+    @apply border-slate-200 bg-white/95 text-slate-700;
+  }
 }

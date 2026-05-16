@@ -29,7 +29,13 @@ class ConfirmPaymentRequest(BaseModel):
 async def stars_invoice(body: PaymentTierRequest, user: User = Depends(get_current_user)):
     if body.tier not in ("basic", "premium"):
         raise HTTPException(400, "tier: basic или premium")
-    return payment_service.stars_invoice_payload(body.tier, user.id)
+    invoice_url = await payment_service.create_stars_invoice_link(body.tier, user.id)
+    if not invoice_url:
+        raise HTTPException(503, "Не удалось создать счёт Stars")
+    return {
+        **payment_service.stars_invoice_payload(body.tier, user.id),
+        "invoice_url": invoice_url,
+    }
 
 
 @router.post("/yookassa")

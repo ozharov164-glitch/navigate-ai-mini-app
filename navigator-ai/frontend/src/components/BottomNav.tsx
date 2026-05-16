@@ -17,7 +17,7 @@ const items: { id: Tab; label: string; icon: typeof Home }[] = [
 
 export function BottomNav({ tab, onChange }: Props) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-slate-950/90 backdrop-blur-xl">
+    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-slate-950/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-lg justify-around px-2 py-2">
         {items.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => onChange(id)} className={cn("nav-item", tab === id && "active")}>

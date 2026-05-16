@@ -20,6 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<AppTheme>("dark");
+  const [moreScroll, setMoreScroll] = useState<"premium" | "privacy" | null>(null);
 
   const load = async () => {
     try {
@@ -41,7 +42,10 @@ export default function App() {
     initTelegram();
     const params = new URLSearchParams(window.location.search);
     const page = params.get("page");
-    if (page === "privacy" || page === "premium") setTab("more");
+    if (page === "privacy" || page === "premium") {
+      setTab("more");
+      setMoreScroll(page);
+    }
     load();
   }, []);
 
@@ -65,7 +69,7 @@ export default function App() {
   if (error && !data) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-        <p className="text-red-400">{error}</p>
+        <p className="text-red-500">{error}</p>
         <button type="button" className="glass-btn mt-4" onClick={load}>
           Повторить
         </button>
@@ -97,7 +101,15 @@ export default function App() {
         {tab === "calendar" && <CalendarPage tasks={data?.tasks_today ?? []} />}
         {tab === "budget" && <BudgetPage />}
         {tab === "routes" && <RoutesPage routes={data?.routes_recent ?? []} />}
-        {tab === "more" && <MorePage isPremium={data?.is_premium ?? false} onTheme={toggleTheme} theme={theme} />}
+        {tab === "more" && (
+          <MorePage
+            isPremium={data?.is_premium ?? false}
+            onTheme={toggleTheme}
+            theme={theme}
+            scrollTo={moreScroll}
+            onRefresh={load}
+          />
+        )}
       </main>
 
       <VoiceFab onDone={load} />

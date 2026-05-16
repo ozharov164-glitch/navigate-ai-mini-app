@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 import { hapticLight } from "@/lib/telegram";
 
 const templates = [
@@ -19,44 +20,37 @@ interface Props {
 }
 
 export function QuickTemplates({ onDone }: Props) {
+  const { showToast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   const run = async (template: string) => {
     if (busy) return;
     hapticLight();
     setBusy(template);
-    setToast(null);
     try {
       const result = await api.analyze(prompts[template] || "", template);
-      setToast(result.summary || "Готово!");
+      showToast(result.summary || "Готово!", "success");
       await onDone();
     } catch (err) {
-      setToast(err instanceof Error ? err.message : "Не удалось выполнить");
+      showToast(err instanceof Error ? err.message : "Не удалось выполнить", "error");
     } finally {
       setBusy(null);
-      setTimeout(() => setToast(null), 4000);
     }
   };
 
   return (
-    <div>
-      {toast && (
-        <p className="mb-2 rounded-lg bg-indigo-500/20 px-3 py-2 text-xs text-indigo-200">{toast}</p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {templates.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className="glass-btn text-xs disabled:opacity-50"
-            disabled={!!busy}
-            onClick={() => run(t.template)}
-          >
-            {busy === t.template ? "⏳ Обработка…" : t.label}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {templates.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className="glass-btn text-xs disabled:opacity-50"
+          disabled={!!busy}
+          onClick={() => run(t.template)}
+        >
+          {busy === t.template ? "⏳ Обработка…" : t.label}
+        </button>
+      ))}
     </div>
   );
 }
