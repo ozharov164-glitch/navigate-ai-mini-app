@@ -85,17 +85,28 @@ async def evening_summary() -> None:
             if not await cache_set_nx(redis_key, ttl=90000):
                 continue
 
-            prompt = (
-                f"Сегодня пользователь сэкономил {user.saved_minutes_today} мин и {user.saved_rub_today} ₽. "
-                "Дай краткий вечерний summary и 2 smart_insights в JSON: summary, smart_insights."
-            )
-            try:
-                analysis = await ai_service.analyze(text=prompt, is_premium=True)
-                insights = analysis.smart_insights
-                summary = analysis.summary
-            except Exception:
-                summary = "День завершён. Завтра — новые возможности!"
-                insights = ["Отдыхайте — завтра продуктивнее с утренним планом"]
+            # Вечерний дайджест без LLM по умолчанию — не тратим OpenRouter на всех proactive-пользователей
+            if settings.ai_worker_evening_llm:
+                prompt = (
+                    f"Сегодня пользователь сэкономил {user.saved_minutes_today} мин и "
+                    f"{user.saved_rub_today} ₽. Краткий summary и 2 insight."
+                )
+                try:
+                    analysis = await ai_service.analyze(text=prompt, is_premium=True)
+                    insights = analysis.smart_insights
+                    summary = analysis.summary
+                except Exception:
+                    summary = "День завершён. Завтра — новые возможности!"
+                    insights = ["Отдыхайте — завтра продуктивнее с утренним планом"]
+            else:
+                summary = (
+                    f"Сегодня AI сэкономил вам {user.saved_minutes_today} мин "
+                    f"и {user.saved_rub_today} ₽."
+                )
+                insights = [
+                    "Завтра утром придёт дайджест с задачами",
+                    "Откройте Mini App — добавьте заметку голосом или текстом",
+                ]
 
             text = f"🌙 <b>Вечерний итог</b>\n\n{summary}\n\n💡 " + "\n💡 ".join(insights[:3])
             await send_telegram_message(user.telegram_id, text)

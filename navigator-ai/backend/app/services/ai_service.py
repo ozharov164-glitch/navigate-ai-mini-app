@@ -1,4 +1,4 @@
-"""Интеграция с OpenRouter / DeepSeek."""
+"""Интеграция с OpenRouter / DeepSeek (с режимом экономии баланса)."""
 import base64
 import hashlib
 import json
@@ -16,17 +16,17 @@ from backend.app.schemas.ai import AIAnalysisResponse
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Цепочки fallback для надёжности
-TRANSCRIBE_MODELS = (
-    "google/gemini-2.5-flash",
-    "openai/gpt-4o-mini",
-    "deepseek/deepseek-v3.2",
-)
-VISION_MODELS = (
+# Дешёвые модели первыми; в budget_mode — только первая
+TRANSCRIBE_MODELS_FULL = (
     "google/gemini-2.5-flash",
     "openai/gpt-4o-mini",
 )
-JSON_PARSE_MAX_RETRIES = 3
+TRANSCRIBE_MODELS_BUDGET = ("google/gemini-2.5-flash",)
+VISION_MODELS_FULL = (
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o-mini",
+)
+VISION_MODELS_BUDGET = ("google/gemini-2.5-flash",)
 
 
 def _openrouter_headers() -> dict[str, str]:
@@ -41,9 +41,9 @@ def _openrouter_headers() -> dict[str, str]:
     }
 
 
-def _cache_key(payload: dict[str, Any]) -> str:
+def _cache_key(prefix: str, payload: dict[str, Any]) -> str:
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-    return f"ai:{hashlib.sha256(raw.encode()).hexdigest()}"
+    return f"{prefix}:{hashlib.sha256(raw.encode()).hexdigest()}"
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -66,6 +66,24 @@ def _safe_analysis(parsed: dict[str, Any], fallback_summary: str = "") -> AIAnal
             summary=parsed.get("summary") or fallback_summary or "Сообщение обработано",
             smart_insights=parsed.get("smart_insights") or [],
         )
+
+
+def _transcribe_models() -> tuple[str, ...]:
+    if settings.ai_budget_mode:
+        return TRANSCRIBE_MODELS_BUDGET
+    return TRANSCRIBE_MODELS_FULL
+
+
+def _vision_models() -> tuple[str, ...]:
+    if settings.ai_budget_mode:
+        return VISION_MODELS_BUDGET
+    return VISION_MODELS_FULL
+
+
+def _json_retries(is_premium: bool) -> int:
+    if settings.ai_budget_mode and not is_premium:
+        return 1
+    return settings.ai_json_retries_premium if is_premium else settings.ai_json_retries
 
 
 class AIService:
@@ -101,6 +119,15 @@ class AIService:
                 raise RuntimeError(f"AI-сервис недоступен (код {resp.status_code})")
             data = resp.json()
 
+        usage = data.get("usage") or {}
+        if usage:
+            logger.info(
+                "OpenRouter model=%s prompt_tokens=%s completion_tokens=%s",
+                model or settings.ai_model,
+                usage.get("prompt_tokens"),
+                usage.get("completion_tokens"),
+            )
+
         choices = data.get("choices") or []
         if not choices:
             raise RuntimeError("Пустой ответ от AI")
@@ -128,15 +155,17 @@ class AIService:
         model: str,
         is_premium: bool,
     ) -> AIAnalysisResponse:
-        """Парсинг JSON с Pydantic-валидацией и повторными попытками."""
+        """Парсинг JSON с Pydantic; число retry ограничено для экономии."""
         last_error = ""
         msgs = list(messages)
+        max_attempts = _json_retries(is_premium)
 
-        for attempt in range(JSON_PARSE_MAX_RETRIES):
+        for attempt in range(max_attempts):
             content = await self._chat_completion(
                 msgs,
                 model=model,
                 json_mode=True,
+                max_tokens=settings.ai_max_tokens,
                 timeout=120.0 if is_premium else 90.0,
             )
             try:
@@ -147,9 +176,9 @@ class AIService:
                 last_error = "Пустой результат"
             except (json.JSONDecodeError, ValidationError) as exc:
                 last_error = str(exc)
-                logger.warning("JSON parse attempt %s failed: %s", attempt + 1, exc)
+                logger.warning("JSON parse attempt %s/%s failed: %s", attempt + 1, max_attempts, exc)
 
-            if attempt < JSON_PARSE_MAX_RETRIES - 1:
+            if attempt < max_attempts - 1:
                 msgs = msgs + [
                     {"role": "assistant", "content": content[:2000] if content else "{}"},
                     {
@@ -177,6 +206,10 @@ class AIService:
         db_context: str | None = None,
         is_premium: bool = False,
     ) -> AIAnalysisResponse:
+        # Уже есть текстовое описание фото — не шлём картинку повторно (экономия ~50% на фото)
+        if photo_description:
+            photo_base64 = None
+
         user_content_parts: list[str] = []
         if template == "receipt":
             user_content_parts.append("Шаблон: разобрать чек. Извлеки все позиции и суммы.")
@@ -202,8 +235,9 @@ class AIService:
         user_message = "\n".join(user_content_parts) or "Пустое сообщение"
 
         cache_payload = {"msg": user_message, "tpl": template, "has_img": bool(photo_base64)}
-        cache_key = _cache_key(cache_payload)
+        cache_key = _cache_key("ai", cache_payload)
         if cached := await cache_get(cache_key):
+            logger.info("AI cache hit template=%s", template)
             return AIAnalysisResponse.model_validate(cached)
 
         messages: list[dict[str, Any]] = [
@@ -223,20 +257,27 @@ class AIService:
                     ],
                 }
             )
-            model = VISION_MODELS[0]
+            model = _vision_models()[0]
         else:
             messages.append({"role": "user", "content": user_message})
             model = settings.ai_model
 
         result = await self._parse_analysis_with_retry(messages, model=model, is_premium=is_premium)
 
-        ttl = settings.ai_cache_ttl if not is_premium else max(settings.ai_cache_ttl // 2, 300)
+        ttl = settings.ai_cache_ttl if not is_premium else max(settings.ai_cache_ttl, 1800)
         await cache_set(cache_key, result.model_dump(mode="json"), ttl=ttl)
         return result
 
     async def transcribe_voice(self, audio_bytes: bytes, filename: str = "voice.ogg") -> str:
         if not settings.openrouter_api_key:
             return "Голосовое сообщение (нет API-ключа)"
+
+        asr_key = _cache_key("asr", {"h": hashlib.sha256(audio_bytes).hexdigest()})
+        if cached := await cache_get(asr_key):
+            if isinstance(cached, str):
+                return cached
+            if isinstance(cached, dict) and cached.get("text"):
+                return str(cached["text"])
 
         b64 = base64.b64encode(audio_bytes).decode()
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "ogg"
@@ -256,44 +297,36 @@ class AIService:
             },
         ]
 
-        for model in TRANSCRIBE_MODELS:
+        for model in _transcribe_models():
             try:
                 text = await self._chat_completion(
-                    audio_messages, model=model, max_tokens=1024, timeout=60.0
+                    audio_messages,
+                    model=model,
+                    max_tokens=settings.ai_transcribe_max_tokens,
+                    timeout=60.0,
                 )
                 if text.strip() and "не удалось" not in text.lower():
+                    await cache_set(asr_key, text, ttl=settings.ai_cache_ttl)
                     return text.strip()
             except Exception as exc:
                 logger.warning("Transcribe %s failed: %s", model, exc)
 
-        # Fallback: описание через текстовую модель (без аудио)
-        try:
-            text = await self._chat_completion(
-                [
-                    {
-                        "role": "user",
-                        "content": (
-                            "Пользователь отправил голосовое в Telegram, но аудио не распознано. "
-                            "Верни короткую фразу: «Голосовое сообщение (распознавание недоступно)»"
-                        ),
-                    }
-                ],
-                model=settings.ai_model,
-                max_tokens=64,
-                timeout=30.0,
-            )
-            return text.strip() or "Голосовое сообщение от пользователя"
-        except Exception:
-            return "Голосовое сообщение от пользователя"
+        return "Голосовое сообщение от пользователя"
 
     async def describe_photo(self, image_bytes: bytes) -> str:
+        img_hash = hashlib.sha256(image_bytes).hexdigest()
+        vis_key = _cache_key("vis", {"h": img_hash})
+        if cached := await cache_get(vis_key):
+            if isinstance(cached, str):
+                return cached
+
         b64 = base64.b64encode(image_bytes).decode()
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "Опиши фото для личного ассистента: чек, билет, документ. "
-                    "На русском: суммы, даты, названия."
+                    "Опиши фото кратко для ассистента: чек, билет, документ. "
+                    "На русском: суммы, даты, названия. Без лишнего текста."
                 ),
             },
             {
@@ -305,9 +338,14 @@ class AIService:
             },
         ]
         try:
-            return await self._chat_with_models(
-                messages, VISION_MODELS, max_tokens=1500, timeout=60.0
+            text = await self._chat_with_models(
+                messages,
+                _vision_models(),
+                max_tokens=settings.ai_vision_max_tokens,
+                timeout=60.0,
             )
+            await cache_set(vis_key, text, ttl=settings.ai_cache_ttl)
+            return text
         except Exception as exc:
             logger.error("Vision failed: %s", exc)
             return "Изображение (не удалось описать)"

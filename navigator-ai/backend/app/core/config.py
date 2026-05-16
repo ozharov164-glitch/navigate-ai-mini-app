@@ -33,8 +33,16 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ai_model: str = "deepseek/deepseek-v3.2"
-    ai_max_tokens: int = 4096
-    ai_cache_ttl: int = 1800
+    # Экономия OpenRouter: меньше токенов и дольше кэш
+    ai_max_tokens: int = 2048
+    ai_cache_ttl: int = 3600
+    ai_json_retries: int = 2
+    ai_json_retries_premium: int = 3
+    # Режим экономии: один vision на фото, без LLM в вечернем дайджесте, короткие fallback-цепочки
+    ai_budget_mode: bool = True
+    ai_worker_evening_llm: bool = False
+    ai_vision_max_tokens: int = 800
+    ai_transcribe_max_tokens: int = 512
     ai_system_prompt: str = (
         "Ты — NavigAI, личный AI-навигатор. Отвечай ТОЛЬКО валидным JSON без markdown. "
         'Схема: {"tasks":[{"title":"str","description":"str|null","due_date":"ISO8601|null",'
