@@ -16,6 +16,7 @@ from backend.app.schemas.ai import AIAnalysisResponse
 from backend.app.services.ai_service import ai_service
 from backend.app.services.context_builder import context_builder
 from backend.app.services.user_service import user_service
+from backend.app.services.osrm_maps import osrm_maps
 from backend.app.services.routing_service import routing_service
 from backend.app.models.user import User
 
@@ -93,9 +94,9 @@ class ActionProcessor:
                   user, r.from_address, r.to_address, r.transport_mode
               )
           except Exception:
-              from backend.app.services.yandex_maps import yandex_maps
-
-              route_info = yandex_maps._fallback_route(r.from_address, r.to_address, r.transport_mode)
+              route_info = osrm_maps._link_only(
+                  r.from_address, r.to_address, r.transport_mode, reason="routing_error"
+              )
           session.add(
               Route(
                   user_id=user.id,

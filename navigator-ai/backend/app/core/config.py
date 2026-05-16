@@ -54,13 +54,17 @@ class Settings(BaseSettings):
         "Если данных мало — пустые массивы и понятный summary."
     )
 
+    # Маршруты: публичный OSRM + Nominatim (нагрузка на VPS только кэш)
+    osrm_base_url: str = "https://router.project-osrm.org"
+    osrm_public_fallback: str = "https://routing.openstreetmap.de"
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
+
+    # Яндекс отключён по умолчанию (оставлено для возможного включения env)
     yandex_maps_api_key: str = ""
-    yandex_geocoder_url: str = "https://geocode-maps.yandex.ru/1.x/"
-    yandex_router_url: str = "https://api.routing.yandex.net/v2/route"
-    yandex_static_map_url: str = "https://static-maps.yandex.ru/1.x/"
     yandex_daily_limit: int = 800
-    yandex_static_disable_above: int = 700  # отключить Static API при превышении счётчика
+    yandex_static_disable_above: int = 700
     yandex_static_map_enabled: bool = True
+
     # Локальный Whisper (экономия OpenRouter ASR)
     whisper_enabled: bool = False
     whisper_url: str = "http://whisper:8000"

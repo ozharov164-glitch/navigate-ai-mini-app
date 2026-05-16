@@ -1,13 +1,12 @@
-import { Link2, Navigation } from "lucide-react";
+import { Globe, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Только Яндекс или fallback (без выбора пользователем). */
 export function RouteProviderBadge({ provider }: { provider?: string | null }) {
-  const isYandex = provider === "yandex";
-  const Icon = isYandex ? Navigation : Link2;
-  const label = isYandex ? "Яндекс" : "Ссылка";
-  const className = isYandex
-    ? "border-amber-400/30 bg-amber-500/15 text-amber-300"
+  const isOsrm = provider === "osrm";
+  const Icon = isOsrm ? Globe : Link2;
+  const label = isOsrm ? "OSM" : "Ссылка";
+  const className = isOsrm
+    ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
     : "border-slate-400/30 bg-white/5 text-slate-400";
 
   return (

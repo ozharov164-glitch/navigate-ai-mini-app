@@ -1,24 +1,20 @@
 # НавигаторAI — отчёт для Grok
 
-> **Обновление:** OSRM убран. Маршруты только Яндекс + fallback-ссылка.
-
-## Маршруты
-
-- `routing_service.py` — только `YANDEX_MAPS_API_KEY` + лимиты Redis
-- Без ключа: `yandex.ru/maps` (время/карта не строятся)
-- Переключатель в Mini App **удалён**
-- Контейнер `osrm` удалён из `docker-compose.prod.yml`
-
-## Яндекс для владельца
-
-1. Ключ: https://developer.tech.yandex.ru/ → Geocoder, Router, Static Maps
-2. `.env`: `YANDEX_MAPS_API_KEY=...`
-3. Freemium + платный бот **не запрещает** ключ, но при росте может понадобиться **коммерческая лицензия** Яндекса (см. условия API)
+> **Маршруты:** только **публичный OSRM + Nominatim** (интернет). Яндекс отключён.  
+> **VPS:** нет тайлов/карт на диске — только HTTP-запросы + Redis-кэш.
 
 ## Env
 
 ```env
-YANDEX_MAPS_API_KEY=...
-YANDEX_DAILY_LIMIT=800
-YANDEX_STATIC_DISABLE_ABOVE=700
+OSRM_BASE_URL=https://router.project-osrm.org
+OSRM_PUBLIC_FALLBACK=https://routing.openstreetmap.de
+NOMINATIM_URL=https://nominatim.openstreetmap.org
+YANDEX_MAPS_API_KEY=
 ```
+
+## Ограничения публичных сервисов
+
+- Nominatim: ~1 req/s, кэш обязателен
+- OSRM demo: не для высокой нагрузки; при росте DAU — платный хостинг OSRM или свой инстанс
+- Нет пробок (в отличие от Яндекса)
+- Превью карты: staticmap.openstreetmap.de (тоже из интернета)

@@ -130,7 +130,7 @@ export function RoutesPage({ routes }: Props) {
                   className="btn-primary mt-4 inline-flex items-center gap-2 !py-2 text-xs"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Открыть в Картах
+                  Открыть маршрут
                 </motion.a>
               )}
             </motion.div>

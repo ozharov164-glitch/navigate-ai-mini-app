@@ -65,7 +65,7 @@ black --check backend bot tests
 - DeepSeek V3.2 + Gemini (голос/фото), `AI_BUDGET_MODE` и Redis-кэш
 - **Лимиты:** free 10 AI/день, premium soft-cap 50/день (настраивается env)
 - Шаблоны day_plan / week_analysis — короткий контекст (top-5 из БД)
-- **Маршруты:** Яндекс.Карты (с API-ключом) или ссылка в Карты без ключа
+- **Маршруты:** OSRM + OpenStreetMap (публичные API, без карт на VPS)
 - Геймификация: streak, XP, уровень, достижения; insights только из БД (без LLM)
 - Yandex daily cap + fallback при 403/429; Stars + YooKassa
 - Mini App: premium UI, «Умный день», шаринг карточки, confetti

@@ -57,7 +57,7 @@ def _route_provider(route: Route) -> str:
         p = route.route_data.get("provider", "")
         if route.route_data.get("fallback"):
             return "fallback"
-        if p == "yandex":
+        if p in ("yandex", "osrm"):
             return p
     return "fallback"
 

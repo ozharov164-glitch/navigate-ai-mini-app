@@ -87,10 +87,7 @@ class OsrmMapsService:
             except Exception as exc:
                 logger.warning("OSRM %s error: %s", base, exc)
 
-        yandex_url = (
-            f"https://yandex.ru/maps/?rtext={from_geo['lat']},{from_geo['lon']}~"
-            f"{to_geo['lat']},{to_geo['lon']}&rtt=auto"
-        )
+        maps_url = self._maps_link(from_geo, to_geo)
         static_map = self._static_map_url(from_geo, to_geo)
 
         result = {
@@ -98,9 +95,9 @@ class OsrmMapsService:
             "to_address": to_geo["address"],
             "duration_minutes": duration_minutes,
             "distance_km": distance_km,
-            "traffic_level": "economy",
+            "traffic_level": "normal",
             "static_map_url": static_map,
-            "yandex_maps_url": yandex_url,
+            "yandex_maps_url": maps_url,  # поле в БД: ссылка «открыть маршрут»
             "route_data": {"provider": "osrm", "mode": mode},
         }
         await cache_set(cache_key, result, ttl=settings.cache_ttl_seconds)
@@ -118,6 +115,15 @@ class OsrmMapsService:
             f"&markers={lat1},{lon1},red-pushpin|{lat2},{lon2},blue-pushpin"
         )
 
+    def _maps_link(self, from_geo: dict, to_geo: dict) -> str:
+        """Ссылка на маршрут (Google Maps — без ключа)."""
+        return (
+            "https://www.google.com/maps/dir/?api=1"
+            f"&origin={from_geo['lat']},{from_geo['lon']}"
+            f"&destination={to_geo['lat']},{to_geo['lon']}"
+            "&travelmode=driving"
+        )
+
     def _link_only(self, from_address: str, to_address: str, mode: str, reason: str = "") -> dict[str, Any]:
         q_from, q_to = quote(from_address), quote(to_address)
         return {
@@ -127,7 +133,9 @@ class OsrmMapsService:
             "distance_km": 8.0,
             "traffic_level": "unknown",
             "static_map_url": "",
-            "yandex_maps_url": f"https://yandex.ru/maps/?rtext={q_from}~{q_to}",
+            "yandex_maps_url": (
+                f"https://www.google.com/maps/dir/?api=1&origin={q_from}&destination={q_to}"
+            ),
             "route_data": {"provider": "link_only", "mode": mode, "reason": reason},
         }
 
