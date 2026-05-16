@@ -1,9 +1,18 @@
 # НавигаторAI — отчёт для Grok (продолжение работы)
 
 > **Дата:** 16 мая 2026  
-> **После деплоя:** commit см. `git log -1` на `main`  
+> **Commit:** `f38a985` — *Production: AI caps, OSRM routing, gamification, DB insights*  
 > **Главный brief:** `GROK_OPTIMIZATION_BRIEF_RU.md`  
 > **Этот файл:** что уже в production, что делать дальше
+
+### Статус деплоя (16.05.2026)
+
+| Компонент | Статус |
+|-----------|--------|
+| **Git push** `main` | ✅ `f38a985` |
+| **Mini App** (GitHub Actions → gh-pages) | ✅ success |
+| **Backend VPS** | ⚠️ **нужен** `export DEPLOY_PASS='…'` → `./navigator-ai/scripts/deploy-to-vps.sh` |
+| **Alembic на VPS** | ⚠️ после backend: `docker compose … exec backend alembic upgrade head` |
 
 ---
 
@@ -113,12 +122,13 @@ export DEPLOY_PASS='...'
 
 ## 4. Backlog для Grok (приоритеты)
 
-### P0 — сразу после деплоя
+### P0 — сразу (Grok / владелец)
 
 | # | Задача | Зачем |
 |---|--------|-------|
-| 1 | Проверить `alembic upgrade head` на VPS | иначе 500 на dashboard (новые колонки) |
-| 2 | Убедиться `FREE_DAILY_ACTIONS=10` в prod `.env` | могло остаться 20 |
+| 0 | **Деплой backend** (см. §3) | без этого API старый, новые фичи не работают |
+| 1 | `alembic upgrade head` на VPS | иначе 500 на dashboard (новые колонки) |
+| 2 | `FREE_DAILY_ACTIONS=10` в prod `.env` | добавлено в локальный `.env.production`, уедет при deploy |
 | 3 | OpenRouter monthly cap в кабинете | страховка $30 |
 
 ### P1 — продукт и экономия
