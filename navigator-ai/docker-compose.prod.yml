@@ -37,6 +37,36 @@ services:
         limits:
           memory: 128M
 
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: navigai-osrm
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --ip 0.0.0.0 --port 5000 /data/map.osrm
+    volumes:
+      - osrm_data:/data:ro
+    expose:
+      - "5000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: navigai-whisper
+    restart: unless-stopped
+    profiles:
+      - whisper
+    environment:
+      WHISPER__MODEL: ${WHISPER_MODEL:-small}
+      WHISPER__INFERENCE_DEVICE: cpu
+    expose:
+      - "8000"
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
   backend:
     build:
       context: .
@@ -48,6 +78,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-navigai}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-navigai}
       REDIS_URL: redis://redis:6379/0
+      OSRM_BASE_URL: http://osrm:5000
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,5 +163,6 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  osrm_data:
   caddy_data:
   caddy_config:

@@ -270,15 +270,22 @@ class AIService:
         return result
 
     async def transcribe_voice(self, audio_bytes: bytes, filename: str = "voice.ogg") -> str:
-        if not settings.openrouter_api_key:
-            return "Голосовое сообщение (нет API-ключа)"
-
         asr_key = _cache_key("asr", {"h": hashlib.sha256(audio_bytes).hexdigest()})
         if cached := await cache_get(asr_key):
             if isinstance(cached, str):
                 return cached
             if isinstance(cached, dict) and cached.get("text"):
                 return str(cached["text"])
+
+        # Локальный Whisper на VPS — без расхода OpenRouter
+        from backend.app.services.whisper_service import whisper_service
+
+        if local := await whisper_service.transcribe(audio_bytes, filename):
+            await cache_set(asr_key, local, ttl=settings.ai_cache_ttl)
+            return local
+
+        if not settings.openrouter_api_key:
+            return "Голосовое сообщение (нет API-ключа)"
 
         b64 = base64.b64encode(audio_bytes).decode()
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "ogg"

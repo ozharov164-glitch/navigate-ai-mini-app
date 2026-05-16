@@ -63,23 +63,29 @@ class OsrmMapsService:
 
         profile = OSRM_PROFILE.get(mode, "driving")
         coords = f"{from_geo['lon']},{from_geo['lat']};{to_geo['lon']},{to_geo['lat']}"
-        url = f"{settings.osrm_base_url.rstrip('/')}/route/v1/{profile}/{coords}"
-
         duration_minutes = 30
         distance_km = 5.0
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url, params={"overview": "false", "steps": "false"})
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("code") == "Ok" and data.get("routes"):
-                        r0 = data["routes"][0]
-                        duration_minutes = max(1, int(r0.get("duration", 1800) / 60))
-                        distance_km = round(r0.get("distance", 5000) / 1000, 1)
-                else:
-                    logger.warning("OSRM HTTP %s", resp.status_code)
-        except Exception as exc:
-            logger.warning("OSRM error: %s", exc)
+        bases = [settings.osrm_base_url.rstrip("/")]
+        pub = settings.osrm_public_fallback.rstrip("/")
+        if pub and pub not in bases:
+            bases.append(pub)
+
+        for base in bases:
+            url = f"{base}/route/v1/{profile}/{coords}"
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(url, params={"overview": "false", "steps": "false"})
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("code") == "Ok" and data.get("routes"):
+                            r0 = data["routes"][0]
+                            duration_minutes = max(1, int(r0.get("duration", 1800) / 60))
+                            distance_km = round(r0.get("distance", 5000) / 1000, 1)
+                            break
+                    else:
+                        logger.warning("OSRM %s HTTP %s", base, resp.status_code)
+            except Exception as exc:
+                logger.warning("OSRM %s error: %s", base, exc)
 
         yandex_url = (
             f"https://yandex.ru/maps/?rtext={from_geo['lat']},{from_geo['lon']}~"

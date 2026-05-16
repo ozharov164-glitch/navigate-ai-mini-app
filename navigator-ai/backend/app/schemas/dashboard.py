@@ -44,9 +44,28 @@ class RouteOut(BaseModel):
     traffic_level: str | None
     static_map_url: str | None
     yandex_maps_url: str | None
+    route_provider: str | None = None  # yandex | osrm | fallback | link_only
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserTemplateOut(BaseModel):
+    id: int
+    title: str
+    prompt: str
+    template_key: str | None
+    icon: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserTemplateIn(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    prompt: str = Field(..., min_length=3, max_length=2000)
+    template_key: str | None = None
+    icon: str = "sparkles"
 
 
 class ReminderOut(BaseModel):
@@ -126,6 +145,7 @@ class DashboardOut(BaseModel):
     routes_recent: list[RouteOut]
     insights: list[InsightOut]
     db_insights: list[DbInsightOut] = Field(default_factory=list)
+    user_templates: list[UserTemplateOut] = Field(default_factory=list)
     gamification: GamificationOut | None = None
     summary_latest: str | None
     saved_minutes_today: int

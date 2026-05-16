@@ -106,6 +106,9 @@ async def process_message(
     if not await user_service.check_daily_limit(db, user):
         raise HTTPException(429, user_service.limit_message(user))
 
+    if input_type in ("voice", "photo") and not user_service.can_use_multimedia(user):
+        raise HTTPException(403, user_service.multimedia_denied_message())
+
     voice_transcript = None
     photo_description = None
     photo_base64 = None

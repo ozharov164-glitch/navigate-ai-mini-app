@@ -105,6 +105,19 @@ class SmartInsight(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class UserTemplate(Base):
+    """Персональные шаблоны пользователя (без LLM при сохранении)."""
+    __tablename__ = "user_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(100))
+    prompt: Mapped[str] = mapped_column(Text)
+    template_key: Mapped[str] = mapped_column(String(30), nullable=True)  # day_plan | null
+    icon: Mapped[str] = mapped_column(String(20), default="sparkles")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ActionLog(Base):
     __tablename__ = "action_logs"
 

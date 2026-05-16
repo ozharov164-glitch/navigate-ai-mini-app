@@ -83,6 +83,7 @@ export interface Dashboard {
   is_premium: boolean;
   theme: "dark" | "light";
   route_provider: "auto" | "yandex" | "osrm";
+  user_templates?: UserTemplate[];
 }
 
 export interface AnalyzeResult {
@@ -117,9 +118,20 @@ export interface Route {
   from_address: string;
   to_address: string;
   duration_minutes: number | null;
+  distance_km?: number | null;
   static_map_url: string | null;
   yandex_maps_url: string | null;
   traffic_level: string | null;
+  route_provider?: string | null;
+}
+
+export interface UserTemplate {
+  id: number;
+  title: string;
+  prompt: string;
+  template_key: string | null;
+  icon: string;
+  created_at: string;
 }
 
 export interface Insight {
@@ -183,6 +195,12 @@ export const api = {
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
   updateSettings: (payload: { theme?: string; route_provider?: string }) =>
     request("/dashboard/settings", { method: "PATCH", body: JSON.stringify(payload) }),
+  createTemplate: (title: string, prompt: string, templateKey?: string) =>
+    request<UserTemplate>("/dashboard/templates", {
+      method: "POST",
+      body: JSON.stringify({ title, prompt, template_key: templateKey ?? null }),
+    }),
+  deleteTemplate: (id: number) => request(`/dashboard/templates/${id}`, { method: "DELETE" }),
   /** Скачивание файла экспорта с авторизацией initData */
   downloadExport: async (path: "/export/ical" | "/export/pdf", filename: string) => {
     const initData = getInitData();

@@ -59,9 +59,19 @@ class Settings(BaseSettings):
     yandex_router_url: str = "https://api.routing.yandex.net/v2/route"
     yandex_static_map_url: str = "https://static-maps.yandex.ru/1.x/"
     yandex_daily_limit: int = 800
+    yandex_static_disable_above: int = 700  # отключить Static API при превышении счётчика
     yandex_static_map_enabled: bool = True
-    osrm_base_url: str = "https://router.project-osrm.org"
+    osrm_base_url: str = "http://osrm:5000"
+    osrm_public_fallback: str = "https://router.project-osrm.org"
     nominatim_url: str = "https://nominatim.openstreetmap.org"
+
+    # Локальный Whisper (экономия OpenRouter ASR)
+    whisper_enabled: bool = False
+    whisper_url: str = "http://whisper:8000"
+    whisper_model: str = "small"
+
+    # Голос и фото — только premium (freemium: текст)
+    premium_only_multimedia: bool = True
 
     stars_basic_price: int = 199
     stars_premium_price: int = 399

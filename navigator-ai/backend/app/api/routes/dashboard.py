@@ -18,6 +18,7 @@ from backend.app.models.content import (
     Route,
     SmartInsight,
     Task,
+    UserTemplate,
 )
 from backend.app.models.user import User, UserPlace
 from backend.app.schemas.dashboard import (
@@ -37,6 +38,8 @@ from backend.app.schemas.dashboard import (
     TaskOut,
     TaskUpdate,
     UserSettingsUpdate,
+    UserTemplateIn,
+    UserTemplateOut,
 )
 from backend.app.services.gamification_service import gamification_service
 from backend.app.services.product_insights_service import product_insights_service
@@ -46,6 +49,22 @@ from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 settings = get_settings()
+
+
+def _route_provider(route: Route) -> str:
+    """Провайдер маршрута из route_data JSON."""
+    if route.route_data and isinstance(route.route_data, dict):
+        p = route.route_data.get("provider", "")
+        if route.route_data.get("fallback"):
+            return "fallback"
+        if p in ("yandex", "osrm", "link_only"):
+            return p
+    return "fallback"
+
+
+def _route_out(route: Route) -> RouteOut:
+    out = RouteOut.model_validate(route)
+    return out.model_copy(update={"route_provider": _route_provider(route)})
 
 
 @router.get("", response_model=DashboardOut)
@@ -102,11 +121,19 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
 
     g = await gamification_service.build_profile(db, user)
     db_insights = await product_insights_service.build(db, user)
+    templates = (
+        await db.execute(
+            select(UserTemplate)
+            .where(UserTemplate.user_id == user.id)
+            .order_by(UserTemplate.created_at.desc())
+            .limit(10)
+        )
+    ).scalars().all()
 
     return DashboardOut(
         tasks_today=[TaskOut.model_validate(t) for t in tasks],
         expenses_month=[ExpenseOut.model_validate(e) for e in expenses],
-        routes_recent=[RouteOut.model_validate(r) for r in routes],
+        routes_recent=[_route_out(r) for r in routes],
         insights=[InsightOut.model_validate(i) for i in insights],
         db_insights=[DbInsightOut.model_validate(i) for i in db_insights],
         gamification=GamificationOut(
@@ -129,7 +156,57 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         is_premium=is_premium,
         theme=user.theme or "dark",
         route_provider=user.route_provider or "auto",
+        user_templates=[UserTemplateOut.model_validate(t) for t in templates],
     )
+
+
+@router.get("/templates", response_model=list[UserTemplateOut])
+async def list_templates(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rows = (
+        await db.execute(
+            select(UserTemplate).where(UserTemplate.user_id == user.id).order_by(UserTemplate.created_at.desc())
+        )
+    ).scalars().all()
+    return [UserTemplateOut.model_validate(t) for t in rows]
+
+
+@router.post("/templates", response_model=UserTemplateOut)
+async def create_template(
+    body: UserTemplateIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    count = (
+        await db.execute(select(func.count(UserTemplate.id)).where(UserTemplate.user_id == user.id))
+    ).scalar() or 0
+    if count >= 15:
+        raise HTTPException(400, "Максимум 15 шаблонов")
+    t = UserTemplate(
+        user_id=user.id,
+        title=body.title.strip(),
+        prompt=body.prompt.strip(),
+        template_key=body.template_key,
+        icon=body.icon or "sparkles",
+    )
+    db.add(t)
+    await db.flush()
+    return UserTemplateOut.model_validate(t)
+
+
+@router.delete("/templates/{template_id}")
+async def delete_template(
+    template_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    t = (
+        await db.execute(
+            select(UserTemplate).where(UserTemplate.id == template_id, UserTemplate.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if t:
+        await db.delete(t)
+    return {"ok": True}
 
 
 @router.post("/analyze")
@@ -155,6 +232,8 @@ async def analyze_voice(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not user_service.can_use_multimedia(user):
+        raise HTTPException(403, user_service.multimedia_denied_message())
     if not await user_service.check_daily_limit(db, user):
         raise HTTPException(429, user_service.limit_message(user))
     content, filename = await read_upload_limited(file, kind="audio")
@@ -204,7 +283,7 @@ async def list_expenses(user: User = Depends(get_current_user), db: AsyncSession
 @router.get("/routes", response_model=list[RouteOut])
 async def list_routes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(select(Route).where(Route.user_id == user.id).order_by(Route.created_at.desc()).limit(50))).scalars().all()
-    return [RouteOut.model_validate(r) for r in rows]
+    return [_route_out(r) for r in rows]
 
 
 @router.get("/reminders", response_model=list[ReminderOut])

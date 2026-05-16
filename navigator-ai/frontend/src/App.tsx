@@ -172,7 +172,7 @@ export default function App() {
         </PageShell>
       </main>
 
-      <VoiceFab onDone={load} />
+      <VoiceFab onDone={load} isPremium={data?.is_premium ?? false} />
       <BottomNav tab={tab} onChange={onTab} />
     </div>
   );

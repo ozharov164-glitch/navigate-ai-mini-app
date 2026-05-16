@@ -1,5 +1,6 @@
 import { BarChart3, CalendarDays, Receipt } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
@@ -49,9 +50,12 @@ interface Props {
 export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
   const { showToast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
+  const lockRef = useRef(0);
 
   const run = async (template: string) => {
-    if (busy || externalBusy) return;
+    const now = Date.now();
+    if (busy || externalBusy || now - lockRef.current < 2000) return;
+    lockRef.current = now;
     hapticLight();
     setBusy(template);
     try {
@@ -71,11 +75,15 @@ export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
         const Icon = t.icon;
         const loading = busy === t.template;
         return (
-          <button
+          <motion.button
             key={t.id}
             type="button"
             disabled={!!busy || externalBusy}
             onClick={() => run(t.template)}
+            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: templates.indexOf(t) * 0.05 }}
             className={cn(
               "glass-card-interactive flex items-start gap-3 p-3 text-left disabled:opacity-60",
               `bg-gradient-to-br ${t.gradient}`
@@ -88,7 +96,7 @@ export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
               <span className="block text-sm font-semibold text-primary">{loading ? "Обработка…" : t.label}</span>
               <span className="mt-0.5 block text-[10px] text-muted">{t.desc}</span>
             </span>
-          </button>
+          </motion.button>
         );
       })}
     </div>

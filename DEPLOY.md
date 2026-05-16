@@ -61,7 +61,7 @@ cd navigator-ai && python -m bot.main
 docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 ```
 
-Миграция `002_gamification_routing`: streak, XP, `route_provider`, soft-cap premium.
+Миграции: `002_gamification_routing`, `003_user_templates`.
 
 Обновите `.env.production`:
 
@@ -70,8 +70,35 @@ FREE_DAILY_ACTIONS=10
 PREMIUM_DAILY_ACTIONS=50
 AI_JSON_RETRIES_PREMIUM=1
 YANDEX_DAILY_LIMIT=800
-OSRM_BASE_URL=https://router.project-osrm.org
+OSRM_BASE_URL=http://osrm:5000
+OSRM_PUBLIC_FALLBACK=https://router.project-osrm.org
+YANDEX_STATIC_DISABLE_ABOVE=700
+PREMIUM_ONLY_MULTIMEDIA=true
+WHISPER_ENABLED=false
 ```
+
+### OSRM на VPS (self-hosted)
+
+1. Подготовка карты (один раз, ~15–30 мин):
+
+```bash
+cd navigator-ai
+./scripts/setup-osrm-data.sh ./osrm-data
+```
+
+2. Смонтируйте volume в `docker-compose.prod.yml` (`osrm_data` → данные `map.osrm`).
+
+3. `docker compose -f docker-compose.prod.yml up -d osrm backend`
+
+Без данных OSRM backend использует `OSRM_PUBLIC_FALLBACK`.
+
+### Whisper (опционально, экономия ASR)
+
+```bash
+docker compose -f docker-compose.prod.yml --profile whisper up -d whisper
+```
+
+В `.env`: `WHISPER_ENABLED=true`, `WHISPER_URL=http://whisper:8000`
 
 ## Тесты перед деплоем
 

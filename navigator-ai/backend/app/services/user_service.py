@@ -48,6 +48,18 @@ class UserService:
     def is_premium(self, user: User) -> bool:
         return _is_premium(user)
 
+    def can_use_multimedia(self, user: User) -> bool:
+        """Голос и фото — только premium (если включено в env)."""
+        if not settings.premium_only_multimedia:
+            return True
+        return self.is_premium(user)
+
+    def multimedia_denied_message(self) -> str:
+        return (
+            "Голос и фото доступны в Premium. "
+            "Оформите подписку в Mini App или отправьте текст."
+        )
+
     def _maybe_reset_daily(self, user: User) -> None:
         today = date.today()
         if not user.daily_actions_date:

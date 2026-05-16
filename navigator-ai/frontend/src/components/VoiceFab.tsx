@@ -7,6 +7,7 @@ import { hapticLight } from "@/lib/telegram";
 
 interface Props {
   onDone: () => void;
+  isPremium?: boolean;
 }
 
 function pickMimeType(): string {
@@ -17,7 +18,7 @@ function pickMimeType(): string {
   return "";
 }
 
-export function VoiceFab({ onDone }: Props) {
+export function VoiceFab({ onDone, isPremium = false }: Props) {
   const { showToast } = useToast();
   const [recording, setRecording] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -32,6 +33,10 @@ export function VoiceFab({ onDone }: Props) {
 
   const startRecording = async () => {
     hapticLight();
+    if (!isPremium) {
+      showToast("Голос — в Premium. Оформите подписку или пишите текстом", "info");
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       showToast("Отправьте голосовое боту @NavigAI_bot", "info");
       return;

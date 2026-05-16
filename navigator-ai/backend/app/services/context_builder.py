@@ -46,7 +46,12 @@ class ContextBuilder:
         reminders_tomorrow = [t for t in tasks if t.due_date and _same_day(t.due_date, tomorrow)]
         lines.append(f"На сегодня: {len(reminders_today)}, на завтра: {len(reminders_tomorrow)}")
         lines.append(
-            f"Метрики дня: сэкономлено {user.saved_minutes_today} мин, {user.saved_rub_today} ₽."
+            f"Метрики дня: сэкономлено {user.saved_minutes_today} мин, {user.saved_rub_today} ₽. "
+            f"Streak: {user.streak_count or 0} дн., XP: {user.xp or 0}."
+        )
+        lines.append(
+            "Составь детальный план: утро (3 пункта), день (3), вечер (2). "
+            "Укажи приоритеты high/medium и рекомендуемое время. Только JSON tasks + summary."
         )
         return "\n".join(lines)
 

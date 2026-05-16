@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { CommandBar } from "@/components/CommandBar";
 import { DbInsights } from "@/components/DbInsights";
 import { EmptyState } from "@/components/EmptyState";
+import { PersonalTemplates } from "@/components/PersonalTemplates";
 import { QuickTemplates } from "@/components/QuickTemplates";
 import { ShareCard } from "@/components/ShareCard";
 import { useToast } from "@/components/Toast";
@@ -53,7 +54,11 @@ export function HomePage({ data, onRefresh }: Props) {
     }
   };
 
-  const smartDay = () => runAnalyze("Составь оптимальный план на сегодня", "day_plan");
+  const smartDay = () =>
+    runAnalyze(
+      "Составь детальный план дня: утро, день и вечер с приоритетами и временными блоками",
+      "day_plan"
+    );
 
   const completedToday = data.tasks_today.filter((t) => t.completed).length;
   const g = data.gamification;
@@ -77,6 +82,7 @@ export function HomePage({ data, onRefresh }: Props) {
           rub={data.saved_rub_today}
           streak={g.streak}
           level={g.level}
+          achievements={g.achievements}
         />
       )}
 
@@ -106,6 +112,15 @@ export function HomePage({ data, onRefresh }: Props) {
           <p className="text-sm leading-relaxed text-secondary">{data.summary_latest}</p>
         </Card>
       )}
+
+      <Card>
+        <PersonalTemplates
+          templates={data.user_templates ?? []}
+          busy={aiBusy}
+          onRun={(prompt, key) => runAnalyze(prompt, key)}
+          onRefresh={onRefresh}
+        />
+      </Card>
 
       <Card>
         <p className="section-label mb-3">Быстрые шаблоны</p>

@@ -60,6 +60,8 @@ class YandexMapsService:
         from_address: str,
         to_address: str,
         mode: str = "auto",
+        *,
+        static_map: bool | None = None,
     ) -> dict[str, Any]:
         if not settings.yandex_maps_api_key:
             return self._fallback_route(from_address, to_address, mode)
@@ -104,9 +106,10 @@ class YandexMapsService:
                 self._log_yandex_error("router", resp.status_code, resp.text)
                 return self._fallback_route(from_address, to_address, mode)
 
-        static_map = ""
-        if router_ok and settings.yandex_static_map_enabled:
-            static_map = self.static_map_url(from_geo["lon"], from_geo["lat"], to_geo["lon"], to_geo["lat"])
+        use_static = static_map if static_map is not None else settings.yandex_static_map_enabled
+        static_map_url = ""
+        if router_ok and use_static:
+            static_map_url = self.static_map_url(from_geo["lon"], from_geo["lat"], to_geo["lon"], to_geo["lat"])
 
         yandex_url = (
             f"https://yandex.ru/maps/?rtext={from_geo['lat']},{from_geo['lon']}~"
@@ -119,7 +122,7 @@ class YandexMapsService:
             "duration_minutes": duration_minutes or 30,
             "distance_km": distance_km or 5.0,
             "traffic_level": traffic_level,
-            "static_map_url": static_map,
+            "static_map_url": static_map_url,
             "yandex_maps_url": yandex_url,
             "route_data": {"provider": "yandex", "mode": mode, "waypoints": waypoints},
         }

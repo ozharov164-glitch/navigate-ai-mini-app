@@ -20,7 +20,9 @@
 
 Дополнительно есть **Telegram Mini App** (React) — дашборд, календарь, бюджет, маршруты, настройки, премиум, приватность.
 
-**Модель монетизации:** freemium (20 AI-действий/день) + premium (Telegram Stars, YooKassa).
+**Модель монетизации:** freemium (10 AI/день, только текст) + premium (50 AI/день, голос/фото, Stars, YooKassa).
+
+**Актуальный отчёт для ИИ:** `GROK_CONTINUATION_REPORT_RU.md`
 
 ---
 
