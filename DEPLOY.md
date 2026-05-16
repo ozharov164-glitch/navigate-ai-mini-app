@@ -52,3 +52,17 @@ cp navigator-ai/.env.example navigator-ai/.env
 docker compose -f navigator-ai/docker-compose.yml up -d postgres redis backend
 cd navigator-ai && python -m bot.main
 ```
+
+## Тесты перед деплоем
+
+```bash
+cd navigator-ai
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+## YooKassa webhook
+
+В личном кабинете YooKassa укажите:
+
+`https://31-128-42-170.sslip.io/api/payments/yookassa-webhook`

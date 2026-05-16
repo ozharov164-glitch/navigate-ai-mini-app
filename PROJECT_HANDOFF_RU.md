@@ -684,40 +684,42 @@ tar backend bot → scp → docker compose up -d --build backend bot worker
 
 ## 17. Рекомендуемый roadmap для «полировки»
 
-### Фаза A — стабильность (1–2 дня)
+### Фаза A — стабильность ✅ (май 2026)
 
-- [ ] Унифицировать все URL (Pages, CORS, MINI_APP_URL, BotFather)
-- [ ] Починить referral flow end-to-end
-- [ ] Починить Stars → premium activation
-- [ ] Закрыть `/payments/confirm` или добавить verification
-- [ ] Export iCal/PDF с auth (header или short-lived token in URL)
-- [ ] Worker: dedupe digests per day
+- [x] Унифицировать все URL (Pages, CORS, MINI_APP_URL, BotFather)
+- [x] Починить referral flow end-to-end
+- [x] Починить Stars → premium activation
+- [x] Закрыть `/payments/confirm` + YooKassa webhook
+- [x] Export iCal/PDF с auth (initData + export token)
+- [x] Worker: dedupe digests per day
 
-### Фаза B — Mini App UX (2–3 дня)
+### Фаза B — Mini App UX ✅ (май 2026)
 
-- [ ] Полная поддержка light theme (audit всех `text-slate-*`)
-- [ ] Текстовое поле AI-запроса на Home
-- [ ] Calendar: `api.tasks()` + месяц
-- [ ] Budget: список expenses
-- [ ] `Telegram.WebApp.openInvoice` для Stars
-- [ ] Заменить alert/confirm на in-app modals
-- [ ] Обработка ошибок во всех mutations
+- [x] Полная поддержка light theme
+- [x] Текстовое поле AI-запроса на Home
+- [x] Calendar: `api.tasks()` + месяц
+- [x] Budget: список expenses
+- [x] `Telegram.WebApp.openInvoice` для Stars
+- [x] In-app modals + toast
+- [x] Обработка ошибок во всех mutations
 
-### Фаза C — качество AI (2–4 дня)
+### Фаза C — качество AI ✅ (май 2026)
 
-- [ ] Надёжная транскрипция (Whisper API / fallback chain)
-- [ ] Валидация JSON schema (instructor / pydantic retry)
-- [ ] Контекст недели для `week_analysis` (реальные данные из БД в prompt)
-- [ ] Receipt template: требовать фото или последний expense
+- [x] Транскрипция: fallback chain (Gemini → GPT-4o-mini → DeepSeek)
+- [x] Vision: fallback chain
+- [x] Pydantic + retry JSON (до 3 попыток)
+- [x] Контекст из БД для `day_plan` / `week_analysis` (`context_builder.py`)
 
-### Фаза D — production hardening
+### Фаза D — production hardening ✅ (май 2026)
 
-- [ ] Тесты (pytest API, e2e bot mocks)
-- [ ] Monitoring (Sentry, structured logs)
-- [ ] Rate limiting per user
-- [ ] Backup postgres
-- [ ] Единый стиль кода (black/ruff, indent 4 spaces)
-- [ ] Вторая миграция alembic при изменении схемы
+- [x] pytest: health, security, AI parse, bot internal
+- [x] Структурированные JSON-логи в production
+- [x] Rate limiting per user (Redis)
+- [x] Валидация upload (размер, magic bytes)
+- [x] Проверка Fernet ENCRYPTION_KEY при старте
+- [x] ruff + black (`pyproject.toml`)
+- [ ] Backup postgres (ручной cron на VPS)
+- [ ] Sentry (опционально)
 
 ---
 

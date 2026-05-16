@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
+from backend.app.core.uploads import read_upload_limited
 from backend.app.models.user import SubscriptionTier
 from backend.app.services.action_processor import action_processor
 from backend.app.services.ai_service import ai_service
@@ -110,14 +111,14 @@ async def process_message(
     receipt_path = None
 
     if file and input_type == "voice":
-        content = await file.read()
-        voice_transcript = await ai_service.transcribe_voice(content, file.filename or "voice.ogg")
+        content, fname = await read_upload_limited(file, kind="audio")
+        voice_transcript = await ai_service.transcribe_voice(content, fname)
     elif file and input_type == "photo":
-        content = await file.read()
+        content, fname = await read_upload_limited(file, kind="image")
         photo_description = await ai_service.describe_photo(content)
         photo_base64 = base64.b64encode(content).decode()
         Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
-        fname = f"{user.id}_{file.filename or 'photo.jpg'}"
+        fname = f"{user.id}_{fname}"
         receipt_path = str(Path(settings.upload_dir) / fname)
         async with aiofiles.open(receipt_path, "wb") as f:
             await f.write(content)

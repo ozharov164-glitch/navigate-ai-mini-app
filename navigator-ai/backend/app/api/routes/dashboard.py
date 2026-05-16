@@ -35,8 +35,8 @@ from backend.app.schemas.dashboard import (
     TaskUpdate,
     UserSettingsUpdate,
 )
+from backend.app.core.uploads import read_upload_limited
 from backend.app.services.action_processor import action_processor
-from backend.app.services.ai_service import ai_service
 from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -133,11 +133,10 @@ async def analyze_voice(
 ):
     if not await user_service.check_daily_limit(db, user):
         raise HTTPException(429, "Лимит 20 действий в сутки. Оформите премиум.")
-    content = await file.read()
-    if not content:
-        raise HTTPException(400, "Пустой аудиофайл")
-    filename = file.filename or "voice.webm"
+    content, filename = await read_upload_limited(file, kind="audio")
     try:
+        from backend.app.services.ai_service import ai_service
+
         transcript = await ai_service.transcribe_voice(content, filename)
         return await action_processor.process_message(
             db, user, text=transcript, voice_transcript=transcript, input_type="voice"

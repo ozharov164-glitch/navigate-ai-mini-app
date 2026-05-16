@@ -14,6 +14,7 @@ from backend.app.models.content import (
 )
 from backend.app.schemas.ai import AIAnalysisResponse
 from backend.app.services.ai_service import ai_service
+from backend.app.services.context_builder import context_builder
 from backend.app.services.user_service import user_service
 from backend.app.services.yandex_maps import yandex_maps
 from backend.app.models.user import User
@@ -36,6 +37,7 @@ class ActionProcessor:
       receipt_path: str | None = None,
   ) -> AIAnalysisResponse:
       places = await user_service.get_places_decrypted(session, user.id)
+      db_context = await context_builder.build_template_context(session, user, template)
       analysis = await ai_service.analyze(
           text=text,
           voice_transcript=voice_transcript,
@@ -45,6 +47,7 @@ class ActionProcessor:
           longitude=longitude,
           user_places=places,
           template=template,
+          db_context=db_context,
           is_premium=user_service.is_premium(user),
       )
       await self._persist(session, user, analysis, input_type, receipt_path)

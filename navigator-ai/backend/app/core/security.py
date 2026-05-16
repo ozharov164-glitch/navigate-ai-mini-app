@@ -22,6 +22,20 @@ def _fernet() -> Fernet:
     return Fernet(key)
 
 
+def validate_encryption_key() -> None:
+    """Проверка Fernet-ключа при старте (production)."""
+    if settings.app_env != "production":
+        return
+    if settings.encryption_key in ("", "change-me", "change-me-32-byte-base64-fernet-key!!"):
+        raise RuntimeError("ENCRYPTION_KEY не настроен для production")
+    try:
+        f = _fernet()
+        token = f.encrypt(b"navigai-check")
+        f.decrypt(token)
+    except Exception as exc:
+        raise RuntimeError("ENCRYPTION_KEY невалиден для Fernet") from exc
+
+
 def encrypt_sensitive(value: str) -> str:
     """Шифрует чувствительные поля (адреса, суммы в vault)."""
     return _fernet().encrypt(value.encode()).decode()

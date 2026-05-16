@@ -1,4 +1,5 @@
 """Интеграция с OpenRouter / DeepSeek."""
+import base64
 import hashlib
 import json
 import logging
@@ -6,6 +7,7 @@ import re
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from backend.app.core.config import get_settings
 from backend.app.core.redis_client import cache_get, cache_set
@@ -14,13 +16,20 @@ from backend.app.schemas.ai import AIAnalysisResponse
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Модели OpenRouter (можно переопределить в .env)
-TRANSCRIBE_MODEL = "google/gemini-2.5-flash"
-VISION_MODEL = "google/gemini-2.5-flash"
+# Цепочки fallback для надёжности
+TRANSCRIBE_MODELS = (
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o-mini",
+    "deepseek/deepseek-v3.2",
+)
+VISION_MODELS = (
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o-mini",
+)
+JSON_PARSE_MAX_RETRIES = 3
 
 
 def _openrouter_headers() -> dict[str, str]:
-    """HTTP-заголовки только в ASCII (httpx не принимает кириллицу в X-Title)."""
     referer = settings.mini_app_url or "https://github.com"
     if not referer.isascii():
         referer = "https://navigai.app"
@@ -51,7 +60,7 @@ def _extract_json(text: str) -> dict[str, Any]:
 def _safe_analysis(parsed: dict[str, Any], fallback_summary: str = "") -> AIAnalysisResponse:
     try:
         return AIAnalysisResponse.model_validate(parsed)
-    except Exception as exc:
+    except ValidationError as exc:
         logger.warning("AI JSON validation failed: %s", exc)
         return AIAnalysisResponse(
             summary=parsed.get("summary") or fallback_summary or "Сообщение обработано",
@@ -97,6 +106,63 @@ class AIService:
             raise RuntimeError("Пустой ответ от AI")
         return (choices[0].get("message") or {}).get("content") or ""
 
+    async def _chat_with_models(
+        self,
+        messages: list[dict[str, Any]],
+        models: tuple[str, ...],
+        **kwargs: Any,
+    ) -> str:
+        last_exc: Exception | None = None
+        for model in models:
+            try:
+                return await self._chat_completion(messages, model=model, **kwargs)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("Model %s failed: %s", model, exc)
+        raise RuntimeError(f"Все модели недоступны: {last_exc}")
+
+    async def _parse_analysis_with_retry(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        model: str,
+        is_premium: bool,
+    ) -> AIAnalysisResponse:
+        """Парсинг JSON с Pydantic-валидацией и повторными попытками."""
+        last_error = ""
+        msgs = list(messages)
+
+        for attempt in range(JSON_PARSE_MAX_RETRIES):
+            content = await self._chat_completion(
+                msgs,
+                model=model,
+                json_mode=True,
+                timeout=120.0 if is_premium else 90.0,
+            )
+            try:
+                parsed = _extract_json(content)
+                result = AIAnalysisResponse.model_validate(parsed)
+                if result.summary or result.tasks or result.expenses or result.routes:
+                    return result
+                last_error = "Пустой результат"
+            except (json.JSONDecodeError, ValidationError) as exc:
+                last_error = str(exc)
+                logger.warning("JSON parse attempt %s failed: %s", attempt + 1, exc)
+
+            if attempt < JSON_PARSE_MAX_RETRIES - 1:
+                msgs = msgs + [
+                    {"role": "assistant", "content": content[:2000] if content else "{}"},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Ответ невалиден. Верни ТОЛЬКО JSON по схеме из system prompt. "
+                            f"Ошибка: {last_error}"
+                        ),
+                    },
+                ]
+
+        return _safe_analysis({}, fallback_summary="Не удалось разобрать ответ AI")
+
     async def analyze(
         self,
         *,
@@ -108,15 +174,19 @@ class AIService:
         longitude: float | None = None,
         user_places: list[dict[str, Any]] | None = None,
         template: str | None = None,
+        db_context: str | None = None,
         is_premium: bool = False,
     ) -> AIAnalysisResponse:
         user_content_parts: list[str] = []
         if template == "receipt":
             user_content_parts.append("Шаблон: разобрать чек. Извлеки все позиции и суммы.")
         elif template == "day_plan":
-            user_content_parts.append("Шаблон: планирование дня. Составь оптимальный план.")
+            user_content_parts.append("Шаблон: планирование дня. Составь оптимальный план на основе контекста.")
         elif template == "week_analysis":
-            user_content_parts.append("Шаблон: анализ недели. Дай сводку и рекомендации.")
+            user_content_parts.append("Шаблон: анализ недели. Дай сводку и рекомендации по реальным данным.")
+
+        if db_context:
+            user_content_parts.append(f"Контекст из базы данных:\n{db_context}")
 
         if voice_transcript:
             user_content_parts.append(f"Голос (транскрипт): {voice_transcript}")
@@ -153,16 +223,12 @@ class AIService:
                     ],
                 }
             )
-            model = VISION_MODEL
+            model = VISION_MODELS[0]
         else:
             messages.append({"role": "user", "content": user_message})
             model = settings.ai_model
 
-        content = await self._chat_completion(
-            messages, model=model, json_mode=True, timeout=120.0 if is_premium else 90.0
-        )
-        parsed = _extract_json(content)
-        result = _safe_analysis(parsed, fallback_summary=content[:300])
+        result = await self._parse_analysis_with_retry(messages, model=model, is_premium=is_premium)
 
         ttl = settings.ai_cache_ttl if not is_premium else max(settings.ai_cache_ttl // 2, 300)
         await cache_set(cache_key, result.model_dump(mode="json"), ttl=ttl)
@@ -172,78 +238,79 @@ class AIService:
         if not settings.openrouter_api_key:
             return "Голосовое сообщение (нет API-ключа)"
 
-        import base64
-
         b64 = base64.b64encode(audio_bytes).decode()
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "ogg"
         fmt = {"ogg": "ogg", "webm": "webm", "mp3": "mpeg", "mpeg": "mpeg", "wav": "wav", "m4a": "mpeg"}.get(ext, "ogg")
 
-        messages = [
+        audio_messages = [
             {
                 "role": "system",
-                "content": "Транскрибируй голосовое сообщение на русском языке. Верни только текст речи без пояснений.",
+                "content": "Транскрибируй голосовое на русском. Верни только текст речи.",
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Транскрибируй это голосовое сообщение."},
-                    {
-                        "type": "input_audio",
-                        "input_audio": {"data": b64, "format": fmt},
-                    },
+                    {"type": "text", "text": "Транскрибируй голосовое сообщение."},
+                    {"type": "input_audio", "input_audio": {"data": b64, "format": fmt}},
                 ],
             },
         ]
 
+        for model in TRANSCRIBE_MODELS:
+            try:
+                text = await self._chat_completion(
+                    audio_messages, model=model, max_tokens=1024, timeout=60.0
+                )
+                if text.strip() and "не удалось" not in text.lower():
+                    return text.strip()
+            except Exception as exc:
+                logger.warning("Transcribe %s failed: %s", model, exc)
+
+        # Fallback: описание через текстовую модель (без аудио)
         try:
             text = await self._chat_completion(
-                messages, model=TRANSCRIBE_MODEL, max_tokens=1024, timeout=60.0
-            )
-            if text.strip():
-                return text.strip()
-        except Exception as exc:
-            logger.warning("Voice transcribe via audio failed: %s", exc)
-
-        # Fallback: текстовая модель без аудио — хотя бы не падаем
-        try:
-            return await self._chat_completion(
                 [
                     {
                         "role": "user",
                         "content": (
-                            "Пользователь отправил голосовое в Telegram. "
-                            "Верни одну фразу-заглушку для ассистента: "
-                            "'Голосовое сообщение (не удалось распознать аудио)'"
+                            "Пользователь отправил голосовое в Telegram, но аудио не распознано. "
+                            "Верни короткую фразу: «Голосовое сообщение (распознавание недоступно)»"
                         ),
                     }
                 ],
+                model=settings.ai_model,
                 max_tokens=64,
                 timeout=30.0,
             )
+            return text.strip() or "Голосовое сообщение от пользователя"
         except Exception:
             return "Голосовое сообщение от пользователя"
 
     async def describe_photo(self, image_bytes: bytes) -> str:
-        import base64
-
         b64 = base64.b64encode(image_bytes).decode()
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "Опиши фото для личного ассистента: чек, билет, документ, полис. "
-                    "На русском, структурированно: суммы, даты, названия."
+                    "Опиши фото для личного ассистента: чек, билет, документ. "
+                    "На русском: суммы, даты, названия."
                 ),
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Опиши содержимое изображения для дальнейшего разбора."},
+                    {"type": "text", "text": "Опиши содержимое изображения."},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
                 ],
             },
         ]
-        return await self._chat_completion(messages, model=VISION_MODEL, max_tokens=1500, timeout=60.0)
+        try:
+            return await self._chat_with_models(
+                messages, VISION_MODELS, max_tokens=1500, timeout=60.0
+            )
+        except Exception as exc:
+            logger.error("Vision failed: %s", exc)
+            return "Изображение (не удалось описать)"
 
 
 ai_service = AIService()
