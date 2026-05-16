@@ -1,6 +1,6 @@
 """Внутренний API для бота (обработка медиа)."""
 import base64
-import os
+import logging
 from pathlib import Path
 
 import aiofiles
@@ -16,6 +16,7 @@ from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/internal/bot", tags=["bot-internal"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _verify_bot_secret(x_bot_secret: str | None = Header(None, alias="X-Bot-Secret")) -> None:
@@ -86,19 +87,27 @@ async def process_message(
     if input_type == "location" and latitude and longitude:
         text = (text or "") + f" Геопозиция: {latitude}, {longitude}"
 
-    result = await action_processor.process_message(
-        db,
-        user,
-        text=text,
-        voice_transcript=voice_transcript,
-        photo_description=photo_description,
-        photo_base64=photo_base64,
-        latitude=latitude,
-        longitude=longitude,
-        template=template,
-        input_type=input_type,
-        receipt_path=receipt_path,
-    )
+    try:
+        result = await action_processor.process_message(
+            db,
+            user,
+            text=text,
+            voice_transcript=voice_transcript,
+            photo_description=photo_description,
+            photo_base64=photo_base64,
+            latitude=latitude,
+            longitude=longitude,
+            template=template,
+            input_type=input_type,
+            receipt_path=receipt_path,
+        )
+    except RuntimeError as exc:
+        logger.exception("AI process failed for user %s", telegram_id)
+        raise HTTPException(503, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Process failed for user %s", telegram_id)
+        raise HTTPException(500, "Ошибка обработки сообщения. Попробуйте позже.") from exc
+
     return {
         "summary": result.summary,
         "tasks_count": len(result.tasks),

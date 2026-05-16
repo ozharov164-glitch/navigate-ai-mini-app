@@ -9,8 +9,8 @@ router = Router()
 
 
 def _format_response(data: dict) -> str:
-    if data.get("error") == "limit":
-        return f"⚠️ {data.get('message', 'Лимит исчерпан')}\n\nОформите премиум: /premium"
+    if data.get("error") in ("limit", "server", "client"):
+        return f"⚠️ {data.get('message', 'Не удалось обработать')}\n\nПопробуйте ещё раз или /premium"
 
     lines = [f"✅ <b>{data.get('summary', 'Готово!')}</b>", ""]
     if data.get("tasks_count"):
@@ -42,13 +42,16 @@ async def handle_voice(message: Message) -> None:
     data = await message.bot.download_file(file.file_path)
     content = data.read() if hasattr(data, "read") else data
 
-    result = await api_client.process(
-        message.from_user.id,
-        input_type="voice",
-        file_bytes=content,
-        filename="voice.ogg",
-    )
-    await status.edit_text(_format_response(result), parse_mode="HTML")
+    try:
+        result = await api_client.process(
+            message.from_user.id,
+            input_type="voice",
+            file_bytes=content,
+            filename="voice.ogg",
+        )
+        await status.edit_text(_format_response(result), parse_mode="HTML")
+    except Exception:
+        await status.edit_text("⚠️ Не удалось обработать голосовое. Попробуйте текстом.", parse_mode="HTML")
 
 
 @router.message(F.photo)
@@ -60,27 +63,33 @@ async def handle_photo(message: Message) -> None:
     content = data.read() if hasattr(data, "read") else data
     caption = message.caption or ""
 
-    result = await api_client.process(
-        message.from_user.id,
-        input_type="photo",
-        text=caption,
-        file_bytes=content,
-        filename="photo.jpg",
-    )
-    await status.edit_text(_format_response(result), parse_mode="HTML")
+    try:
+        result = await api_client.process(
+            message.from_user.id,
+            input_type="photo",
+            text=caption,
+            file_bytes=content,
+            filename="photo.jpg",
+        )
+        await status.edit_text(_format_response(result), parse_mode="HTML")
+    except Exception:
+        await status.edit_text("⚠️ Не удалось обработать фото. Попробуйте снова.", parse_mode="HTML")
 
 
 @router.message(F.location)
 async def handle_location(message: Message) -> None:
     status = await message.answer("📍 Строю маршрут...")
-    result = await api_client.process(
-        message.from_user.id,
-        input_type="location",
-        text=message.caption or "Текущая геопозиция",
-        latitude=message.location.latitude,
-        longitude=message.location.longitude,
-    )
-    await status.edit_text(_format_response(result), parse_mode="HTML")
+    try:
+        result = await api_client.process(
+            message.from_user.id,
+            input_type="location",
+            text=message.caption or "Текущая геопозиция",
+            latitude=message.location.latitude,
+            longitude=message.location.longitude,
+        )
+        await status.edit_text(_format_response(result), parse_mode="HTML")
+    except Exception:
+        await status.edit_text("⚠️ Не удалось построить маршрут.", parse_mode="HTML")
 
 
 @router.message(F.text)
@@ -97,10 +106,13 @@ async def handle_text(message: Message) -> None:
     elif "недел" in lower:
         template = "week_analysis"
 
-    result = await api_client.process(
-        message.from_user.id,
-        input_type="text",
-        text=message.text,
-        template=template,
-    )
-    await status.edit_text(_format_response(result), parse_mode="HTML")
+    try:
+        result = await api_client.process(
+            message.from_user.id,
+            input_type="text",
+            text=message.text,
+            template=template,
+        )
+        await status.edit_text(_format_response(result), parse_mode="HTML")
+    except Exception:
+        await status.edit_text("⚠️ AI временно недоступен. Попробуйте через минуту.", parse_mode="HTML")

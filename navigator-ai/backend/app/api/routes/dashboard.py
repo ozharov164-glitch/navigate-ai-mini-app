@@ -114,11 +114,13 @@ async def analyze_text(
 ):
     if not await user_service.check_daily_limit(db, user):
         raise HTTPException(429, "Лимит 20 действий в сутки. Оформите премиум.")
-    result = await action_processor.process_message(
-        db, user, text=body.text, template=body.template,
-        latitude=body.latitude, longitude=body.longitude, input_type="text",
-    )
-    return result
+    try:
+        return await action_processor.process_message(
+            db, user, text=body.text, template=body.template,
+            latitude=body.latitude, longitude=body.longitude, input_type="text",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.patch("/tasks/{task_id}")

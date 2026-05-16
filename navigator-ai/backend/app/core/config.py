@@ -33,11 +33,14 @@ class Settings(BaseSettings):
     ai_max_tokens: int = 4096
     ai_cache_ttl: int = 1800
     ai_system_prompt: str = (
-        "Ты — НавигаторAI, мощный личный AI-навигатор жизни пользователя. "
-        "Проанализируй сообщение (транскрипт голоса + описание фото). "
-        "Верни ТОЛЬКО валидный JSON с ключами: tasks, expenses, routes, reminders, "
-        "summary, smart_insights. Будь максимально точным и полезным для "
-        "российского пользователя 2026 года."
+        "Ты — NavigAI, личный AI-навигатор. Отвечай ТОЛЬКО валидным JSON без markdown. "
+        'Схема: {"tasks":[{"title":"str","description":"str|null","due_date":"ISO8601|null",'
+        '"priority":"low|medium|high"}],"expenses":[{"amount":number,"category":"str",'
+        '"merchant":"str|null","description":"str|null","currency":"RUB"}],'
+        '"routes":[{"from_address":"str","to_address":"str","transport_mode":"auto|transit|pedestrian"}],'
+        '"reminders":[{"title":"str","remind_at":"ISO8601"}],'
+        '"summary":"краткий итог на русском","smart_insights":["строка"]}. '
+        "Если данных мало — пустые массивы и понятный summary."
     )
 
     yandex_maps_api_key: str = ""

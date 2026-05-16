@@ -61,6 +61,20 @@ class BotApiClient:
           )
           if resp.status_code == 429:
               return {"error": "limit", "message": resp.json().get("detail", "Лимит исчерпан")}
+          if resp.status_code >= 500:
+              detail = "Сервер временно недоступен"
+              try:
+                  detail = resp.json().get("detail", detail)
+              except Exception:
+                  pass
+              return {"error": "server", "message": str(detail)}
+          if resp.status_code >= 400:
+              detail = "Ошибка запроса"
+              try:
+                  detail = resp.json().get("detail", detail)
+              except Exception:
+                  pass
+              return {"error": "client", "message": str(detail)}
           resp.raise_for_status()
           return resp.json()
 

@@ -85,7 +85,10 @@ class ActionProcessor:
               )
           )
       for r in data.routes:
-          route_info = await yandex_maps.route(r.from_address, r.to_address, r.transport_mode)
+          try:
+              route_info = await yandex_maps.route(r.from_address, r.to_address, r.transport_mode)
+          except Exception:
+              route_info = yandex_maps._fallback_route(r.from_address, r.to_address, r.transport_mode)
           session.add(
               Route(
                   user_id=user.id,
