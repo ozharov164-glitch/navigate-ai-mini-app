@@ -9,7 +9,7 @@
 
 - **API (HTTPS):** https://31-128-42-170.sslip.io
 - **Webhook:** https://31-128-42-170.sslip.io/bot/webhook
-- **Mini App (после GitHub Pages):** https://dmitriidekhanov.github.io/doit_bot/
+- **Mini App:** https://ozharov164-glitch.github.io/navigate-ai-mini-app/
 
 ## GitHub Pages (Mini App)
 
