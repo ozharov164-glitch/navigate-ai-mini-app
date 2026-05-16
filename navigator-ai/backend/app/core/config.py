@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     bot_username: str = "NavigAI_bot"
     webhook_url: str = ""
     webhook_secret: str = ""
-    mini_app_url: str = "https://example.com"
+    mini_app_url: str = "https://ozharov164-glitch.github.io/navigate-ai-mini-app/"
     api_base_url: str = "http://localhost:8000"
     allow_private_only: bool = True
 
@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 3600
 
-    cors_origins: str = "https://web.telegram.org"
+    cors_origins: str = (
+        "https://ozharov164-glitch.github.io,"
+        "https://web.telegram.org"
+    )
 
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"

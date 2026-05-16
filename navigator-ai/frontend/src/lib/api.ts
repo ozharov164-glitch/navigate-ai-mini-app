@@ -153,8 +153,27 @@ export const api = {
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
   updateSettings: (theme: string) =>
     request("/dashboard/settings", { method: "PATCH", body: JSON.stringify({ theme }) }),
-  exportIcal: () => `${API}/export/ical`,
-  exportPdf: () => `${API}/export/pdf`,
+  /** Скачивание файла экспорта с авторизацией initData */
+  downloadExport: async (path: "/export/ical" | "/export/pdf", filename: string) => {
+    const initData = getInitData();
+    if (!initData) {
+      throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
+    }
+    const res = await fetch(`${API}${path}`, {
+      headers: { "X-Telegram-Init-Data": initData },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(typeof err.detail === "string" ? err.detail : "Ошибка экспорта");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   starsInvoice: (tier: string) =>
     request("/payments/stars-invoice", { method: "POST", body: JSON.stringify({ tier }) }),
   yookassa: (tier: string) =>

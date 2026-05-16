@@ -12,10 +12,21 @@ class BotApiClient:
       self.headers = {"X-Bot-Secret": settings.webhook_secret or ""}
 
   async def ensure_user(self, telegram_id: int, **kwargs) -> dict[str, Any]:
+      payload = {"telegram_id": telegram_id, **kwargs}
       async with httpx.AsyncClient(timeout=30.0) as client:
           resp = await client.post(
               f"{self.base}/api/internal/bot/ensure-user",
-              json={"telegram_id": telegram_id, **kwargs},
+              json=payload,
+              headers=self.headers,
+          )
+          resp.raise_for_status()
+          return resp.json()
+
+  async def activate_premium(self, telegram_id: int, tier: str, payment_ref: str | None = None) -> dict[str, Any]:
+      async with httpx.AsyncClient(timeout=30.0) as client:
+          resp = await client.post(
+              f"{self.base}/api/internal/bot/activate-premium",
+              json={"telegram_id": telegram_id, "tier": tier, "payment_ref": payment_ref},
               headers=self.headers,
           )
           resp.raise_for_status()

@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import async_session
+from backend.app.core.redis_client import cache_set_nx
 from backend.app.models.content import Digest, Reminder, Route, Task
 from backend.app.models.user import User
 from backend.app.services.ai_service import ai_service
@@ -26,6 +27,18 @@ async def send_telegram_message(chat_id: int, text: str) -> None:
         await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
 
 
+async def _digest_sent_today(session, user_id: int, digest_type: str) -> bool:
+    """Проверка: дайджест этого типа уже отправлен сегодня."""
+    existing = await session.execute(
+        select(Digest.id).where(
+            Digest.user_id == user_id,
+            Digest.digest_type == digest_type,
+            Digest.digest_date == date.today(),
+        ).limit(1)
+    )
+    return existing.scalar_one_or_none() is not None
+
+
 async def morning_digest() -> None:
     async with async_session() as session:
         users = (await session.execute(select(User).where(User.proactive_enabled.is_(True)))).scalars().all()
@@ -33,6 +46,13 @@ async def morning_digest() -> None:
             tz = pytz.timezone(user.timezone or settings.default_timezone)
             now = datetime.now(tz)
             if now.hour != settings.morning_digest_hour:
+                continue
+
+            if await _digest_sent_today(session, user.id, "morning"):
+                continue
+
+            redis_key = f"digest:morning:{user.id}:{date.today().isoformat()}"
+            if not await cache_set_nx(redis_key, ttl=90000):
                 continue
 
             tasks = (
@@ -56,6 +76,13 @@ async def evening_summary() -> None:
             tz = pytz.timezone(user.timezone or settings.default_timezone)
             now = datetime.now(tz)
             if now.hour != settings.evening_summary_hour:
+                continue
+
+            if await _digest_sent_today(session, user.id, "evening"):
+                continue
+
+            redis_key = f"digest:evening:{user.id}:{date.today().isoformat()}"
+            if not await cache_set_nx(redis_key, ttl=90000):
                 continue
 
             prompt = (
@@ -100,7 +127,7 @@ async def check_reminders() -> None:
 
 
 async def traffic_alerts() -> None:
-    """Уведомления о пробках для свежих маршрутов."""
+    """Уведомления о пробках — не чаще одного раза в сутки на маршрут."""
     async with async_session() as session:
         routes = (
             await session.execute(
@@ -108,15 +135,35 @@ async def traffic_alerts() -> None:
             )
         ).scalars().all()
         seen_users: set[int] = set()
+        today_str = date.today().isoformat()
+
         for route in routes:
             if route.user_id in seen_users:
                 continue
+
+            route_data = dict(route.route_data or {})
+            if route_data.get("traffic_alert_sent") == today_str:
+                continue
+
+            redis_key = f"traffic:{route.id}:{today_str}"
+            if not await cache_set_nx(redis_key, ttl=90000):
+                continue
+
             seen_users.add(route.user_id)
             user = (await session.execute(select(User).where(User.id == route.user_id))).scalar_one()
             if not user.proactive_enabled:
                 continue
-            msg = f"🚗 Пробки на маршруте {route.from_address[:30]} → {route.to_address[:30]} (~{route.duration_minutes} мин)"
+
+            msg = (
+                f"🚗 Пробки на маршруте {route.from_address[:30]} → {route.to_address[:30]} "
+                f"(~{route.duration_minutes} мин)"
+            )
             await send_telegram_message(user.telegram_id, msg)
+
+            route_data["traffic_alert_sent"] = today_str
+            route.route_data = route_data
+
+        await session.commit()
 
 
 async def run_loop() -> None:

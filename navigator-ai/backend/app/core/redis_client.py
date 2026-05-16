@@ -55,3 +55,11 @@ async def cache_delete_pattern(pattern: str) -> None:
         keys.append(key)
     if keys:
         await r.delete(*keys)
+
+
+async def cache_set_nx(key: str, ttl: int = 86400) -> bool:
+    """Устанавливает ключ только если его ещё нет (дедупликация уведомлений)."""
+    r = await get_redis()
+    if not r:
+        return True
+    return bool(await r.set(key, "1", ex=ttl, nx=True))

@@ -21,6 +21,7 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
         username=message.from_user.username,
         first_name=message.from_user.first_name,
         last_name=message.from_user.last_name,
+        referral_code=referral,
     )
 
     rows: list[list[InlineKeyboardButton]] = []
@@ -29,7 +30,10 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
 
     ref_text = ""
     if referral:
-        ref_text = "\n🎁 Реферальный код принят — бонус после первого действия."
+        if info.get("referral_applied"):
+            ref_text = "\n🎁 Реферальный код применён — реферер получил +14 дней премиум."
+        else:
+            ref_text = "\n🎁 Реферальный код принят (уже использован или недействителен)."
 
     local_hint = ""
     if not rows:

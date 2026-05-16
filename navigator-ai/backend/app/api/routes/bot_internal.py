@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
+from backend.app.models.user import SubscriptionTier
 from backend.app.services.action_processor import action_processor
 from backend.app.services.ai_service import ai_service
 from backend.app.services.user_service import user_service
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def _verify_bot_secret(x_bot_secret: str | None = Header(None, alias="X-Bot-Secret")) -> None:
-    if settings.webhook_secret and x_bot_secret != settings.webhook_secret:
+    """Внутренний API бота — всегда требует настроенный WEBHOOK_SECRET."""
+    if not settings.webhook_secret:
+        raise HTTPException(503, "WEBHOOK_SECRET не настроен на сервере")
+    if x_bot_secret != settings.webhook_secret:
         raise HTTPException(403, "Forbidden")
 
 
@@ -29,6 +33,13 @@ class BotUserEnsure(BaseModel):
     username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
+    referral_code: str | None = None
+
+
+class ActivatePremiumBody(BaseModel):
+    telegram_id: int
+    tier: str  # basic | premium
+    payment_ref: str | None = None
 
 
 @router.post("/ensure-user")
@@ -38,11 +49,38 @@ async def ensure_user(body: BotUserEnsure, db: AsyncSession = Depends(get_db), _
     )
     if not user.onboarding_completed:
         user.onboarding_completed = True
+
+    referral_applied = False
+    if body.referral_code:
+        referral_applied = await user_service.apply_referral(db, user, body.referral_code)
+
     return {
         "user_id": user.id,
         "referral_code": user.referral_code,
         "is_premium": user_service.is_premium(user),
         "daily_left": max(0, settings.free_daily_actions - user.daily_actions_count),
+        "referral_applied": referral_applied,
+    }
+
+
+@router.post("/activate-premium")
+async def activate_premium(
+    body: ActivatePremiumBody,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(_verify_bot_secret),
+):
+    """Активация премиум после успешной оплаты Stars (вызывается только ботом)."""
+    if body.tier not in ("basic", "premium"):
+        raise HTTPException(400, "tier: basic или premium")
+
+    user = await user_service.get_or_create(db, body.telegram_id)
+    sub_tier = SubscriptionTier.BASIC.value if body.tier == "basic" else SubscriptionTier.PREMIUM.value
+    await user_service.extend_premium(user, days=30, tier=sub_tier)
+    logger.info("Premium activated for telegram_id=%s tier=%s ref=%s", body.telegram_id, body.tier, body.payment_ref)
+    return {
+        "ok": True,
+        "premium_until": user.premium_until.isoformat() if user.premium_until else None,
+        "tier": user.tier,
     }
 
 

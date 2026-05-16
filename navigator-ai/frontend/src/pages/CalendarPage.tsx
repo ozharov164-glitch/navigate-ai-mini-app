@@ -1,4 +1,4 @@
-import { apiBase, type Task } from "@/lib/api";
+import { api, type Task } from "@/lib/api";
 
 interface Props {
   tasks: Task[];
@@ -38,9 +38,13 @@ export function CalendarPage({ tasks }: Props) {
           </ul>
         )}
       </section>
-      <a className="glass-btn block text-center text-sm" href={`${apiBase()}/export/ical`}>
+      <button
+        type="button"
+        className="glass-btn w-full text-center text-sm"
+        onClick={() => api.downloadExport("/export/ical", "navigai.ics").catch(() => alert("Ошибка экспорта"))}
+      >
         📅 Экспорт iCal
-      </a>
+      </button>
     </div>
   );
 }

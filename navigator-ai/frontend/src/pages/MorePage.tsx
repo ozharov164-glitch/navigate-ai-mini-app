@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, apiBase } from "@/lib/api";
-import { getInitData } from "@/lib/telegram";
+import { api } from "@/lib/api";
 
 interface Props {
   isPremium: boolean;
@@ -23,16 +22,24 @@ export function MorePage({ isPremium, onTheme, theme = "dark" }: Props) {
     api.documents().then(setDocs).catch(() => []);
   }, []);
 
-  const exportIcal = () => {
-    window.open(`${apiBase()}/export/ical?init=${encodeURIComponent(getInitData())}`, "_blank");
+  const exportIcal = async () => {
+    try {
+      await api.downloadExport("/export/ical", "navigai.ics");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка экспорта iCal");
+    }
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!isPremium) {
       alert("PDF только для премиум");
       return;
     }
-    window.open(`${apiBase()}/export/pdf`, "_blank");
+    try {
+      await api.downloadExport("/export/pdf", "navigai-report.pdf");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка экспорта PDF");
+    }
   };
 
   const deleteAll = async () => {

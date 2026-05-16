@@ -73,3 +73,24 @@ def decode_access_token(token: str) -> int | None:
         return int(payload.get("sub", 0))
     except Exception:
         return None
+
+
+def create_export_token(user_id: int, export_type: str = "export", expires_minutes: int = 5) -> str:
+    """Краткоживущий токен для скачивания iCal/PDF без заголовков (window.open)."""
+    payload = {
+        "sub": str(user_id),
+        "scope": f"export:{export_type}",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_minutes),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_export_token(token: str) -> int | None:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        scope = payload.get("scope", "")
+        if not str(scope).startswith("export:"):
+            return None
+        return int(payload.get("sub", 0))
+    except Exception:
+        return None

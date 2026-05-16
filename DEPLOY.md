@@ -13,15 +13,18 @@
 
 ## GitHub Pages (Mini App)
 
-1. Создайте репозиторий `doit_bot` на GitHub и запушьте этот проект.
+1. Репозиторий: `https://github.com/ozharov164-glitch/navigate-ai-mini-app`
 2. **Settings → Pages → Build: GitHub Actions**
-3. **Settings → Secrets and variables → Actions:**
-   - `VITE_API_URL` = `https://31-128-42-170.sslip.io`
-4. **Settings → Variables (optional):**
-   - `VITE_BASE_PATH` = `/doit_bot/`
-5. Push в `main` — workflow `.github/workflows/deploy-frontend.yml` соберёт фронт.
+3. Workflow `.github/workflows/deploy-frontend.yml` задаёт:
+   - `VITE_API_URL` = `https://31-128-42-170.sslip.io/api`
+   - `VITE_BASE_PATH` = `/navigate-ai-mini-app/`
+4. Push в `main` — автодеплой на ветку `gh-pages`.
 
-В BotFather укажите Web App URL: `https://dmitriidekhanov.github.io/doit_bot/`
+В **BotFather** укажите Web App URL (должен совпадать с `MINI_APP_URL` и `CORS_ORIGINS`):
+
+```
+https://ozharov164-glitch.github.io/navigate-ai-mini-app/
+```
 
 ## VPS
 
@@ -34,6 +37,18 @@ export DEPLOY_PASS='ваш-пароль'
 
 Стек: `docker compose -f docker-compose.prod.yml`
 
+В `.env.production` на сервере:
+
+```env
+MINI_APP_URL=https://ozharov164-glitch.github.io/navigate-ai-mini-app/
+CORS_ORIGINS=https://ozharov164-glitch.github.io,https://web.telegram.org
+```
+
 ## Локальный запуск
 
-Отключён. Для разработки используйте `.env` + `docker compose` или polling локально.
+```bash
+cp navigator-ai/.env.example navigator-ai/.env
+# WEBHOOK_URL пустой → polling
+docker compose -f navigator-ai/docker-compose.yml up -d postgres redis backend
+cd navigator-ai && python -m bot.main
+```
