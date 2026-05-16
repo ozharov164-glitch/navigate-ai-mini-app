@@ -1,0 +1,136 @@
+"""Фоновый worker: proactive-дайджесты и напоминания."""
+import asyncio
+import logging
+from datetime import date, datetime, timezone
+
+import httpx
+import pytz
+from sqlalchemy import select
+
+from backend.app.core.config import get_settings
+from backend.app.core.database import async_session
+from backend.app.models.content import Digest, Reminder, Route, Task
+from backend.app.models.user import User
+from backend.app.services.ai_service import ai_service
+
+settings = get_settings()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+async def send_telegram_message(chat_id: int, text: str) -> None:
+    if not settings.bot_token:
+        return
+    url = f"https://api.telegram.org/bot{settings.bot_token}/sendMessage"
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
+
+
+async def morning_digest() -> None:
+    async with async_session() as session:
+        users = (await session.execute(select(User).where(User.proactive_enabled.is_(True)))).scalars().all()
+        for user in users:
+            tz = pytz.timezone(user.timezone or settings.default_timezone)
+            now = datetime.now(tz)
+            if now.hour != settings.morning_digest_hour:
+                continue
+
+            tasks = (
+                await session.execute(
+                    select(Task).where(Task.user_id == user.id, Task.completed.is_(False)).limit(10)
+                )
+            ).scalars().all()
+            task_lines = "\n".join(f"• {t.title}" for t in tasks) or "Задач на сегодня нет — отличный день!"
+            text = f"☀️ <b>Утренний дайджест НавигаторAI</b>\n\n{task_lines}\n\n📱 Открой дашборд в Mini App"
+            await send_telegram_message(user.telegram_id, text)
+            session.add(
+                Digest(user_id=user.id, digest_type="morning", content=text, insights=[], digest_date=date.today())
+            )
+        await session.commit()
+
+
+async def evening_summary() -> None:
+    async with async_session() as session:
+        users = (await session.execute(select(User).where(User.proactive_enabled.is_(True)))).scalars().all()
+        for user in users:
+            tz = pytz.timezone(user.timezone or settings.default_timezone)
+            now = datetime.now(tz)
+            if now.hour != settings.evening_summary_hour:
+                continue
+
+            prompt = (
+                f"Сегодня пользователь сэкономил {user.saved_minutes_today} мин и {user.saved_rub_today} ₽. "
+                "Дай краткий вечерний summary и 2 smart_insights в JSON: summary, smart_insights."
+            )
+            try:
+                analysis = await ai_service.analyze(text=prompt, is_premium=True)
+                insights = analysis.smart_insights
+                summary = analysis.summary
+            except Exception:
+                summary = "День завершён. Завтра — новые возможности!"
+                insights = ["Отдыхайте — завтра продуктивнее с утренним планом"]
+
+            text = f"🌙 <b>Вечерний итог</b>\n\n{summary}\n\n💡 " + "\n💡 ".join(insights[:3])
+            await send_telegram_message(user.telegram_id, text)
+            session.add(
+                Digest(
+                    user_id=user.id,
+                    digest_type="evening",
+                    content=summary,
+                    insights=insights,
+                    digest_date=date.today(),
+                )
+            )
+        await session.commit()
+
+
+async def check_reminders() -> None:
+    async with async_session() as session:
+        now = datetime.now(timezone.utc)
+        reminders = (
+            await session.execute(
+                select(Reminder).where(Reminder.sent.is_(False), Reminder.remind_at <= now)
+            )
+        ).scalars().all()
+        for rem in reminders:
+            user = (await session.execute(select(User).where(User.id == rem.user_id))).scalar_one()
+            await send_telegram_message(user.telegram_id, f"⏰ <b>Напоминание:</b> {rem.title}")
+            rem.sent = True
+        await session.commit()
+
+
+async def traffic_alerts() -> None:
+    """Уведомления о пробках для свежих маршрутов."""
+    async with async_session() as session:
+        routes = (
+            await session.execute(
+                select(Route).where(Route.traffic_level == "heavy").order_by(Route.created_at.desc()).limit(20)
+            )
+        ).scalars().all()
+        seen_users: set[int] = set()
+        for route in routes:
+            if route.user_id in seen_users:
+                continue
+            seen_users.add(route.user_id)
+            user = (await session.execute(select(User).where(User.id == route.user_id))).scalar_one()
+            if not user.proactive_enabled:
+                continue
+            msg = f"🚗 Пробки на маршруте {route.from_address[:30]} → {route.to_address[:30]} (~{route.duration_minutes} мин)"
+            await send_telegram_message(user.telegram_id, msg)
+
+
+async def run_loop() -> None:
+    logger.info("Worker НавигаторAI запущен")
+    while True:
+        try:
+            await check_reminders()
+            await morning_digest()
+            await evening_summary()
+            await traffic_alerts()
+        except Exception:
+            logger.exception("Worker cycle error")
+        await asyncio.sleep(60)
+
+
+if __name__ == "__main__":
+    asyncio.run(run_loop())

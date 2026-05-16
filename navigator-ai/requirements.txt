@@ -1,0 +1,37 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+aiogram==3.28.2
+aiohttp>=3.10,<4
+pydantic>=2.13,<2.14
+pydantic-settings==2.6.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+aiosqlite==0.20.0
+alembic==1.14.0
+greenlet>=3.1.1
+
+# Redis & tasks
+redis==5.2.1
+httpx==0.28.1
+
+# Security & crypto
+cryptography==44.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# AI & media
+openai==1.57.4
+Pillow>=12.0
+
+# Payments & export
+reportlab==4.2.5
+icalendar==6.1.0
+
+# Utils
+python-multipart==0.0.19
+aiofiles==24.1.0
+python-dateutil==2.9.0.post0
+pytz==2024.2

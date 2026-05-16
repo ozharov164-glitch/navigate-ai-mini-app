@@ -1,0 +1,13 @@
+.DS_Store
+**/.DS_Store
+.env
+.env.*
+!.env.example
+!.env.production.example
+navigator-ai/.env
+navigator-ai/.env.production
+navigator-ai/.venv/
+navigator-ai/*.db
+navigator-ai/uploads/
+**/node_modules/
+**/__pycache__/
