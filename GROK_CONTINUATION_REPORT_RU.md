@@ -11,8 +11,8 @@
 |-----------|--------|
 | **Git push** `main` | ✅ `f38a985` |
 | **Mini App** (GitHub Actions → gh-pages) | ✅ success |
-| **Backend VPS** | ⚠️ **нужен** `export DEPLOY_PASS='…'` → `./navigator-ai/scripts/deploy-to-vps.sh` |
-| **Alembic на VPS** | ⚠️ после backend: `docker compose … exec backend alembic upgrade head` |
+| **Backend VPS** | ✅ деплой 16.05.2026 (`ba10b1c`) |
+| **Alembic на VPS** | ✅ `alembic upgrade head` |
 
 ---
 
