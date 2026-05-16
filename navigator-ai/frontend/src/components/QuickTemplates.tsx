@@ -1,13 +1,39 @@
+import { BarChart3, CalendarDays, Receipt } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
+import { cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/telegram";
 
 const templates = [
-  { id: "receipt", label: "🧾 Разобрать чек", template: "receipt" },
-  { id: "day", label: "📅 Планирование дня", template: "day_plan" },
-  { id: "week", label: "📊 Анализ недели", template: "week_analysis" },
-];
+  {
+    id: "receipt",
+    template: "receipt",
+    label: "Разобрать чек",
+    desc: "Фото или текст чека",
+    icon: Receipt,
+    gradient: "from-emerald-500/20 to-teal-500/5",
+    iconColor: "text-emerald-400",
+  },
+  {
+    id: "day",
+    template: "day_plan",
+    label: "План дня",
+    desc: "Оптимальный распорядок",
+    icon: CalendarDays,
+    gradient: "from-cyan-500/20 to-blue-500/5",
+    iconColor: "text-cyan-400",
+  },
+  {
+    id: "week",
+    template: "week_analysis",
+    label: "Анализ недели",
+    desc: "Задачи и расходы",
+    icon: BarChart3,
+    gradient: "from-violet-500/20 to-purple-500/5",
+    iconColor: "text-violet-400",
+  },
+] as const;
 
 const prompts: Record<string, string> = {
   receipt: "Разбери последний чек и добавь расходы по категориям",
@@ -39,18 +65,31 @@ export function QuickTemplates({ onDone }: Props) {
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {templates.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          className="glass-btn text-xs disabled:opacity-50"
-          disabled={!!busy}
-          onClick={() => run(t.template)}
-        >
-          {busy === t.template ? "⏳ Обработка…" : t.label}
-        </button>
-      ))}
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {templates.map((t) => {
+        const Icon = t.icon;
+        const loading = busy === t.template;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            disabled={!!busy}
+            onClick={() => run(t.template)}
+            className={cn(
+              "glass-card-interactive flex items-start gap-3 p-3 text-left disabled:opacity-60",
+              `bg-gradient-to-br ${t.gradient}`
+            )}
+          >
+            <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5", t.iconColor)}>
+              <Icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-primary">{loading ? "Обработка…" : t.label}</span>
+              <span className="mt-0.5 block text-[10px] text-muted">{t.desc}</span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,10 +1,14 @@
-import { Check, Send } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
+import { CommandBar } from "@/components/CommandBar";
 import { useState } from "react";
 import type { Dashboard, Task } from "@/lib/api";
 import { api } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
 import { QuickTemplates } from "@/components/QuickTemplates";
+import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
+import { displayName, timeGreeting } from "@/lib/greeting";
 import { hapticLight } from "@/lib/telegram";
 
 interface Props {
@@ -18,6 +22,7 @@ export function HomePage({ data, onRefresh }: Props) {
   const [aiBusy, setAiBusy] = useState(false);
 
   const toggle = async (task: Task) => {
+    hapticLight();
     try {
       await api.toggleTask(task.id, !task.completed);
       onRefresh();
@@ -43,83 +48,100 @@ export function HomePage({ data, onRefresh }: Props) {
     }
   };
 
+  const completedToday = data.tasks_today.filter((t) => t.completed).length;
+
   return (
-    <div className="space-y-4 animate-slide-up">
+    <div className="stagger-children space-y-4 pb-2">
+      <div className="px-0.5">
+        <h2 className="heading-display">
+          {timeGreeting()}, {displayName()}!
+        </h2>
+        <p className="mt-1 text-sm text-secondary">
+          {data.saved_minutes_today > 0 || data.saved_rub_today > 0
+            ? `Сегодня AI уже сэкономил ${data.saved_minutes_today} мин и учёл ${data.saved_rub_today.toLocaleString("ru")} ₽`
+            : "Кидай голосовое или текст — я всё разложу по полочкам"}
+        </p>
+      </div>
+
       {data.summary_latest && (
-        <section className="glass-card p-4">
-          <h2 className="text-sm font-medium text-accent">Последний summary</h2>
-          <p className="mt-2 text-sm text-secondary">{data.summary_latest}</p>
-        </section>
+        <Card>
+          <p className="section-label mb-2 flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            Последний summary
+          </p>
+          <p className="text-sm leading-relaxed text-secondary">{data.summary_latest}</p>
+        </Card>
       )}
 
-      <section className="glass-card p-4">
-        <h2 className="mb-2 text-sm font-medium text-primary">AI-запрос</h2>
-        <p className="mb-2 text-xs text-muted">Текст, заметка или команда — бот разберёт в задачи и расходы</p>
-        <textarea
-          className="input-field min-h-[72px] resize-none"
-          placeholder="Например: завтра в 10 встреча с врачом, купить молоко…"
-          value={aiText}
-          onChange={(e) => setAiText(e.target.value)}
-          disabled={aiBusy}
-        />
-        <button
-          type="button"
-          className="glass-btn mt-2 flex w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
-          disabled={aiBusy || !aiText.trim()}
-          onClick={submitAi}
-        >
-          {aiBusy ? "⏳ Обработка…" : (
-            <>
-              <Send className="h-4 w-4" /> Отправить AI
-            </>
-          )}
-        </button>
-      </section>
-
-      <section className="glass-card p-4">
-        <h2 className="mb-3 text-sm font-medium text-primary">Быстрые шаблоны</h2>
+      <Card>
+        <p className="section-label mb-3">Быстрые шаблоны</p>
         <QuickTemplates onDone={onRefresh} />
-      </section>
+      </Card>
 
-      <section className="glass-card p-4">
-        <h2 className="mb-3 text-sm font-medium text-primary">План на сегодня</h2>
-        <ul className="space-y-2">
-          {data.tasks_today.length === 0 && (
-            <p className="text-sm text-muted">Задач нет — отправьте боту голосовое или текст</p>
+      <Card>
+        <p className="section-label mb-3">AI-команда</p>
+        <CommandBar
+          value={aiText}
+          onChange={setAiText}
+          onSubmit={submitAi}
+          busy={aiBusy}
+          placeholder="Завтра в 10 встреча с врачом, купить молоко…"
+        />
+        <p className="mt-2 text-[10px] text-muted">Enter — отправить · микрофон внизу — голос</p>
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="section-label">План на сегодня</p>
+          {data.tasks_today.length > 0 && (
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-muted">
+              {completedToday}/{data.tasks_today.length}
+            </span>
           )}
-          {data.tasks_today.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => toggle(t)}
-                className="flex w-full items-start gap-3 rounded-xl p-2 text-left hover:bg-white/5"
-              >
-                <span
-                  className={cn(
-                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
-                    t.completed ? "border-emerald-500 bg-emerald-500/20" : "border-slate-500"
-                  )}
+        </div>
+        {data.tasks_today.length === 0 ? (
+          <EmptyState
+            title="Пока пусто"
+            description="Кидай голосовое в бота или нажми микрофон внизу — я всё сделаю"
+          />
+        ) : (
+          <ul className="space-y-1">
+            {data.tasks_today.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => toggle(t)}
+                  className="group flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-white/[0.04] active:scale-[0.99]"
                 >
-                  {t.completed && <Check className="h-3 w-3 text-emerald-400" />}
-                </span>
-                <span className={cn("text-sm text-primary", t.completed && "line-through text-muted")}>{t.title}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+                  <span className={cn("task-checkbox", t.completed && "checked")}>
+                    {t.completed && <Check className="h-3 w-3 text-emerald-400" strokeWidth={3} />}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm leading-snug text-primary transition-all",
+                      t.completed && "text-muted line-through"
+                    )}
+                  >
+                    {t.title}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {data.insights.length > 0 && (
-        <section className="glass-card p-4">
-          <h2 className="mb-2 text-sm font-medium text-amber-400">Smart Insights</h2>
+        <Card>
+          <p className="section-label mb-3 text-amber-400/90">Smart Insights</p>
           <ul className="space-y-2">
             {data.insights.map((i) => (
-              <li key={i.id} className="insight-card rounded-lg p-3 text-sm">
+              <li key={i.id} className="insight-card">
                 {i.insight}
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
     </div>
   );

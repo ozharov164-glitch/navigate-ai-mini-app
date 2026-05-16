@@ -4,6 +4,7 @@ declare global {
     Telegram?: {
       WebApp: {
         initData: string;
+        initDataUnsafe?: { user?: { first_name?: string; last_name?: string } };
         colorScheme: "light" | "dark";
         themeParams: Record<string, string>;
         ready: () => void;
@@ -12,6 +13,8 @@ declare global {
         setBackgroundColor: (color: string) => void;
         HapticFeedback?: { impactOccurred: (style: string) => void };
         openInvoice?: (url: string, callback?: (status: string) => void) => void;
+        onEvent?: (event: string, handler: () => void) => void;
+        offEvent?: (event: string, handler: () => void) => void;
       };
     };
   }
@@ -27,7 +30,7 @@ export function initTelegram(): void {
   tg.ready();
   tg.expand();
   const light = tg.colorScheme === "light";
-  tg.setHeaderColor(light ? "#f1f5f9" : "#0f172a");
+  tg.setHeaderColor(light ? "#f1f5f9" : "#0a0f1f");
   tg.setBackgroundColor(light ? "#f8fafc" : "#020617");
 }
 

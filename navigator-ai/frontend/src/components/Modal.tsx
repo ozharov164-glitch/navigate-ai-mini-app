@@ -35,6 +35,7 @@ export function Modal({
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onCancel}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle sm:hidden" aria-hidden />
         <h3 className="modal-title">{title}</h3>
         <div className="modal-message">{message}</div>
         <div className="modal-actions">
@@ -45,7 +46,7 @@ export function Modal({
           )}
           <button
             type="button"
-            className={`glass-btn flex-1 text-sm ${danger ? "modal-btn-danger" : "modal-btn-primary"}`}
+            className={`flex-1 text-sm ${danger ? "modal-btn-danger" : "modal-btn-primary"}`}
             onClick={onConfirm}
           >
             {confirmLabel}

@@ -2,6 +2,7 @@ import { Mic, Square } from "lucide-react";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
+import { cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/telegram";
 
 interface Props {
@@ -63,7 +64,7 @@ export function VoiceFab({ onDone }: Props) {
       recorderRef.current = recorder;
       recorder.start();
       setRecording(true);
-      setStatus("Запись… Нажмите ещё раз, чтобы отправить");
+      setStatus("Говорите… Нажмите ещё раз, чтобы отправить");
     } catch {
       stopStream();
       showToast("Нет доступа к микрофону. Голосовое — боту @NavigAI_bot", "error");
@@ -84,18 +85,31 @@ export function VoiceFab({ onDone }: Props) {
   return (
     <>
       {status && (
-        <div className="voice-status fixed bottom-28 left-1/2 z-40 max-w-[90%] -translate-x-1/2 rounded-xl px-4 py-2 text-center text-xs shadow-lg">
+        <div className="voice-status fixed bottom-[5.75rem] left-1/2 z-40 max-w-[88%] -translate-x-1/2 rounded-2xl px-4 py-2.5 text-center text-xs font-medium animate-scale-in">
           {status}
         </div>
       )}
-      <button
-        type="button"
-        onClick={handleClick}
-        className={`voice-fab fixed bottom-[5.5rem] left-1/2 z-40 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full border border-indigo-400/40 bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/40 transition ${recording ? "scale-110 animate-pulse ring-2 ring-red-400" : "hover:scale-105"}`}
-        aria-label={recording ? "Остановить запись" : "Голосовой ввод"}
-      >
-        {recording ? <Square className="h-5 w-5 text-white" /> : <Mic className="h-6 w-6 text-white" />}
-      </button>
+      <div className="fixed bottom-[4.75rem] left-1/2 z-40 -translate-x-1/2">
+        {!recording && (
+          <span
+            className="pointer-events-none absolute inset-0 animate-pulse-ring rounded-full bg-accent/30"
+            aria-hidden
+          />
+        )}
+        <button
+          type="button"
+          onClick={handleClick}
+          className={cn(
+            "relative flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full",
+            "bg-gradient-to-br from-cyan-400 to-cyan-600 text-navy-950 shadow-glow",
+            "transition-all duration-200 hover:scale-105 active:scale-95",
+            recording && "scale-110 ring-2 ring-red-400/80 ring-offset-2 ring-offset-navy-950 animate-pulse-soft"
+          )}
+          aria-label={recording ? "Остановить запись" : "Голосовой ввод"}
+        >
+          {recording ? <Square className="h-5 w-5 fill-current" /> : <Mic className="h-6 w-6" strokeWidth={2.25} />}
+        </button>
+      </div>
     </>
   );
 }

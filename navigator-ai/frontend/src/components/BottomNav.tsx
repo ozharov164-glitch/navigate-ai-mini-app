@@ -17,15 +17,26 @@ const items: { id: Tab; label: string; icon: typeof Home }[] = [
 
 export function BottomNav({ tab, onChange }: Props) {
   return (
-    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-slate-950/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-lg justify-around px-2 py-2">
-        {items.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => onChange(id)} className={cn("nav-item", tab === id && "active")}>
-            <Icon className="h-5 w-5" />
-            {label}
-          </button>
-        ))}
-      </div>
-    </nav>
+    <div className="nav-dock-wrap">
+      <nav className="nav-dock" aria-label="Основная навигация">
+        {items.map(({ id, label, icon: Icon }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onChange(id)}
+              className={cn("nav-item min-w-[52px] flex-1", active && "active")}
+              aria-current={active ? "page" : undefined}
+            >
+              <span className="nav-icon-wrap">
+                <Icon className={cn("h-[18px] w-[18px]", active && "scale-105")} strokeWidth={active ? 2.25 : 1.75} />
+              </span>
+              <span className={cn("truncate", active && "font-semibold")}>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
