@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.api.deps import get_current_user
+from backend.app.api.deps import get_current_user, get_export_user
 from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
 from backend.app.core.security import decrypt_sensitive
@@ -94,9 +94,9 @@ async def map_preview(
     fo: float,
     tl: float,
     tol: float,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_export_user),
 ):
-    """Прокси превью карты (OSM static), чтобы Mini App не блокировал внешние домены."""
+    """Прокси превью карты (OSM). Auth: заголовок или ?init= для <img src>."""
     _ = user
     try:
         body, ctype = await osrm_maps.fetch_static_preview(fl, fo, tl, tol)

@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
-import { motion } from "framer-motion";
 import { apiBase } from "@/lib/api";
 import { getInitData } from "@/lib/telegram";
 
@@ -18,49 +17,17 @@ function previewFetchPath(staticMapUrl: string): string | null {
 }
 
 export function RouteMapPreview({ url, className }: { url: string; className?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
+  const src = useMemo(() => {
     const path = previewFetchPath(url);
-    if (!path) {
-      setFailed(true);
-      return;
-    }
-
-    let objectUrl: string | null = null;
-    let cancelled = false;
-
     const initData = getInitData();
-    if (!initData) {
-      setFailed(true);
-      return;
-    }
-
-    fetch(`${apiBase()}${path}`, {
-      headers: { "X-Telegram-Init-Data": initData },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(String(res.status));
-        return res.blob();
-      })
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-        setFailed(false);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    if (!path || !initData) return null;
+    const sep = path.includes("?") ? "&" : "?";
+    return `${apiBase()}${path}${sep}init=${encodeURIComponent(initData)}`;
   }, [url]);
 
-  if (failed) {
+  if (failed || !src) {
     return (
       <div
         className={`relative flex h-44 items-center justify-center bg-gradient-to-br from-cyan-500/15 via-indigo-500/10 to-navy-900 ${className ?? ""}`}
@@ -70,18 +37,13 @@ export function RouteMapPreview({ url, className }: { url: string; className?: s
     );
   }
 
-  if (!src) {
-    return (
-      <motion.div
-        className={`h-44 w-full animate-pulse bg-white/5 ${className ?? ""}`}
-        initial={{ opacity: 0.4 }}
-        animate={{ opacity: 0.7 }}
-        transition={{ repeat: Infinity, duration: 1.2, repeatType: "reverse" }}
-      />
-    );
-  }
-
   return (
-    <img src={src} alt="" className={className ?? "h-44 w-full object-cover"} loading="lazy" />
+    <img
+      src={src}
+      alt=""
+      className={className ?? "h-44 w-full object-cover"}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
