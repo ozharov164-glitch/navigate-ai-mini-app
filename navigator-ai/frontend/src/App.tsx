@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Dashboard } from "@/lib/api";
+import { applyTheme, resolveInitialTheme, type AppTheme } from "@/lib/theme";
 import { hapticLight, initTelegram } from "@/lib/telegram";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,13 +19,16 @@ export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<AppTheme>("dark");
 
   const load = async () => {
     try {
       setError(null);
       const d = await api.dashboard();
       setData(d);
+      const next = resolveInitialTheme(d.theme);
+      setTheme(next);
+      applyTheme(next);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ошибка загрузки";
       setError(msg === "Load failed" || msg === "Failed to fetch" ? "Нет связи с сервером" : msg);
@@ -41,30 +45,19 @@ export default function App() {
     load();
   }, []);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.classList.toggle("light", theme === "light");
-    if (theme === "light") {
-      document.body.classList.add("bg-slate-100", "text-slate-900");
-      document.body.classList.remove("text-slate-100");
-    } else {
-      document.body.classList.remove("bg-slate-100", "text-slate-900");
-      document.body.classList.add("text-slate-100");
-    }
-  }, [theme]);
-
   const onTab = (t: Tab) => {
     hapticLight();
     setTab(t);
   };
 
   const toggleTheme = async () => {
-    const next = theme === "dark" ? "light" : "dark";
+    const next: AppTheme = theme === "dark" ? "light" : "dark";
     setTheme(next);
+    applyTheme(next);
     try {
       await api.updateSettings(next);
     } catch {
-      /* offline ok */
+      /* сохранение темы — best effort */
     }
   };
 
@@ -73,22 +66,25 @@ export default function App() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
         <p className="text-red-400">{error}</p>
-        <button className="glass-btn mt-4" onClick={load}>
+        <button type="button" className="glass-btn mt-4" onClick={load}>
           Повторить
         </button>
       </div>
     );
   }
 
+  const headerBg = theme === "light" ? "bg-white/90 border-slate-200" : "bg-slate-950/80 border-white/5";
+  const subtitleClass = theme === "light" ? "text-slate-500" : "text-slate-400";
+
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-24 animate-fade-in">
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-slate-950/80 px-4 py-3 backdrop-blur-xl">
+      <header className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-xl ${headerBg}`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">НавигаторAI</h1>
-            <p className="text-xs text-slate-400">@NavigAI_bot</p>
+            <p className={`text-xs ${subtitleClass}`}>@NavigAI_bot</p>
           </div>
-          <button onClick={toggleTheme} className="glass-btn text-xs">
+          <button type="button" onClick={toggleTheme} className="glass-btn text-xs" aria-label="Переключить тему">
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
         </div>
@@ -101,7 +97,7 @@ export default function App() {
         {tab === "calendar" && <CalendarPage tasks={data?.tasks_today ?? []} />}
         {tab === "budget" && <BudgetPage />}
         {tab === "routes" && <RoutesPage routes={data?.routes_recent ?? []} />}
-        {tab === "more" && <MorePage isPremium={data?.is_premium ?? false} onTheme={toggleTheme} />}
+        {tab === "more" && <MorePage isPremium={data?.is_premium ?? false} onTheme={toggleTheme} theme={theme} />}
       </main>
 
       <VoiceFab onDone={load} />

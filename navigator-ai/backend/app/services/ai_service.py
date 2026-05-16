@@ -175,7 +175,8 @@ class AIService:
         import base64
 
         b64 = base64.b64encode(audio_bytes).decode()
-        fmt = "ogg" if filename.endswith(".ogg") else "mpeg"
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "ogg"
+        fmt = {"ogg": "ogg", "webm": "webm", "mp3": "mpeg", "mpeg": "mpeg", "wav": "wav", "m4a": "mpeg"}.get(ext, "ogg")
 
         messages = [
             {

@@ -2,8 +2,8 @@
 from aiogram import F, Router
 from aiogram.types import Message
 
-from bot.config import settings
 from bot.services.api_client import api_client
+from bot.utils.keyboard import mini_app_keyboard
 
 router = Router()
 
@@ -31,8 +31,11 @@ def _format_response(data: dict) -> str:
             f"\n📊 Сегодня AI сэкономил: <b>{data.get('saved_minutes', 0)} мин</b> "
             f"и <b>{data.get('saved_rub', 0)} ₽</b>"
         )
-    lines.append(f"\n📱 Подробности в <a href='{settings.mini_app_url}'>Mini App</a>")
     return "\n".join(lines)
+
+
+def _reply_markup():
+    return mini_app_keyboard("📱 Открыть Mini App")
 
 
 @router.message(F.voice)
@@ -49,9 +52,13 @@ async def handle_voice(message: Message) -> None:
             file_bytes=content,
             filename="voice.ogg",
         )
-        await status.edit_text(_format_response(result), parse_mode="HTML")
+        await status.edit_text(_format_response(result), parse_mode="HTML", reply_markup=_reply_markup())
     except Exception:
-        await status.edit_text("⚠️ Не удалось обработать голосовое. Попробуйте текстом.", parse_mode="HTML")
+        await status.edit_text(
+            "⚠️ Не удалось обработать голосовое. Попробуйте текстом.",
+            parse_mode="HTML",
+            reply_markup=_reply_markup(),
+        )
 
 
 @router.message(F.photo)
@@ -71,9 +78,13 @@ async def handle_photo(message: Message) -> None:
             file_bytes=content,
             filename="photo.jpg",
         )
-        await status.edit_text(_format_response(result), parse_mode="HTML")
+        await status.edit_text(_format_response(result), parse_mode="HTML", reply_markup=_reply_markup())
     except Exception:
-        await status.edit_text("⚠️ Не удалось обработать фото. Попробуйте снова.", parse_mode="HTML")
+        await status.edit_text(
+            "⚠️ Не удалось обработать фото. Попробуйте снова.",
+            parse_mode="HTML",
+            reply_markup=_reply_markup(),
+        )
 
 
 @router.message(F.location)
@@ -87,9 +98,13 @@ async def handle_location(message: Message) -> None:
             latitude=message.location.latitude,
             longitude=message.location.longitude,
         )
-        await status.edit_text(_format_response(result), parse_mode="HTML")
+        await status.edit_text(_format_response(result), parse_mode="HTML", reply_markup=_reply_markup())
     except Exception:
-        await status.edit_text("⚠️ Не удалось построить маршрут.", parse_mode="HTML")
+        await status.edit_text(
+            "⚠️ Не удалось построить маршрут.",
+            parse_mode="HTML",
+            reply_markup=_reply_markup(),
+        )
 
 
 @router.message(F.text)
@@ -113,6 +128,10 @@ async def handle_text(message: Message) -> None:
             text=message.text,
             template=template,
         )
-        await status.edit_text(_format_response(result), parse_mode="HTML")
+        await status.edit_text(_format_response(result), parse_mode="HTML", reply_markup=_reply_markup())
     except Exception:
-        await status.edit_text("⚠️ AI временно недоступен. Попробуйте через минуту.", parse_mode="HTML")
+        await status.edit_text(
+            "⚠️ AI временно недоступен. Попробуйте через минуту.",
+            parse_mode="HTML",
+            reply_markup=_reply_markup(),
+        )

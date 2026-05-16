@@ -1,7 +1,7 @@
 """Dashboard и CRUD для Mini App."""
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +36,7 @@ from backend.app.schemas.dashboard import (
     UserSettingsUpdate,
 )
 from backend.app.services.action_processor import action_processor
+from backend.app.services.ai_service import ai_service
 from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -103,6 +104,7 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         tier=user.tier,
         daily_actions_left=left,
         is_premium=is_premium,
+        theme=user.theme or "dark",
     )
 
 
@@ -118,6 +120,27 @@ async def analyze_text(
         return await action_processor.process_message(
             db, user, text=body.text, template=body.template,
             latitude=body.latitude, longitude=body.longitude, input_type="text",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.post("/analyze-voice")
+async def analyze_voice(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await user_service.check_daily_limit(db, user):
+        raise HTTPException(429, "Лимит 20 действий в сутки. Оформите премиум.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Пустой аудиофайл")
+    filename = file.filename or "voice.webm"
+    try:
+        transcript = await ai_service.transcribe_voice(content, filename)
+        return await action_processor.process_message(
+            db, user, text=transcript, voice_transcript=transcript, input_type="voice"
         )
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc

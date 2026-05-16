@@ -1,5 +1,5 @@
 """Клавиатуры: Web App только при HTTPS (Telegram не принимает localhost)."""
-from aiogram.types import InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from bot.config import settings
 
@@ -20,3 +20,10 @@ def mini_app_button(text: str, path: str = "") -> InlineKeyboardButton | None:
     if not url:
         return None
     return InlineKeyboardButton(text=text, web_app=WebAppInfo(url=url))
+
+
+def mini_app_keyboard(text: str = "📱 Открыть Mini App", path: str = "") -> InlineKeyboardMarkup | None:
+    btn = mini_app_button(text, path)
+    if not btn:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[[btn]])

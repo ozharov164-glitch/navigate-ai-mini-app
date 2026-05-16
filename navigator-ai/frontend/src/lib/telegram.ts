@@ -26,8 +26,9 @@ export function initTelegram(): void {
   if (!tg) return;
   tg.ready();
   tg.expand();
-  tg.setHeaderColor("#0f172a");
-  tg.setBackgroundColor("#020617");
+  const light = tg.colorScheme === "light";
+  tg.setHeaderColor(light ? "#f1f5f9" : "#0f172a");
+  tg.setBackgroundColor(light ? "#f8fafc" : "#020617");
 }
 
 export function hapticLight(): void {

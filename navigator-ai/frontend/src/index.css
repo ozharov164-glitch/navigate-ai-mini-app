@@ -4,8 +4,12 @@
 
 @layer base {
   body {
-    @apply min-h-screen overflow-x-hidden;
+    @apply min-h-screen overflow-x-hidden transition-colors duration-300;
     background: radial-gradient(ellipse at top, #1e1b4b 0%, #0f172a 45%, #020617 100%);
+  }
+
+  html.light body {
+    background: radial-gradient(ellipse at top, #e0e7ff 0%, #f1f5f9 50%, #f8fafc 100%);
   }
 }
 
@@ -13,13 +17,34 @@
   .glass-card {
     @apply rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl;
   }
+  html.light .glass-card {
+    @apply border-slate-200/80 bg-white/70 text-slate-900 shadow-md;
+  }
+
   .glass-btn {
     @apply rounded-xl border border-white/15 bg-white/10 px-4 py-2 backdrop-blur-md transition hover:bg-white/20 active:scale-[0.98];
   }
+  html.light .glass-btn {
+    @apply border-slate-300 bg-white text-slate-800 hover:bg-slate-50;
+  }
+
   .nav-item {
     @apply flex flex-col items-center gap-0.5 text-[10px] text-slate-400 transition;
   }
+  html.light .nav-item {
+    @apply text-slate-500;
+  }
   .nav-item.active {
     @apply text-indigo-400;
+  }
+  html.light .nav-item.active {
+    @apply text-indigo-600;
+  }
+
+  .text-muted {
+    @apply text-slate-400;
+  }
+  html.light .text-muted {
+    @apply text-slate-600;
   }
 }

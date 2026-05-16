@@ -106,6 +106,7 @@ class DashboardOut(BaseModel):
     tier: str
     daily_actions_left: int
     is_premium: bool
+    theme: str = "dark"
 
 
 class AnalyzeIn(BaseModel):

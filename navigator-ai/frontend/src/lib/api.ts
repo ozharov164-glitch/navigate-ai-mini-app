@@ -52,6 +52,16 @@ export interface Dashboard {
   tier: string;
   daily_actions_left: number;
   is_premium: boolean;
+  theme: "dark" | "light";
+}
+
+export interface AnalyzeResult {
+  summary: string;
+  tasks: unknown[];
+  expenses: unknown[];
+  routes: unknown[];
+  reminders: unknown[];
+  smart_insights: string[];
 }
 
 export interface Task {
@@ -98,10 +108,37 @@ export const api = {
       body: JSON.stringify({ completed }),
     }),
   analyze: (text: string, template?: string) =>
-    request("/dashboard/analyze", {
+    request<AnalyzeResult>("/dashboard/analyze", {
       method: "POST",
       body: JSON.stringify({ text, template }),
     }),
+
+  analyzeVoice: async (blob: Blob, filename = "voice.webm"): Promise<AnalyzeResult> => {
+    const initData = getInitData();
+    if (!initData) {
+      throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
+    }
+    const form = new FormData();
+    form.append("file", blob, filename);
+
+    let res: Response;
+    try {
+      res = await fetch(`${API}/dashboard/analyze-voice`, {
+        method: "POST",
+        headers: { "X-Telegram-Init-Data": initData },
+        body: form,
+      });
+    } catch {
+      throw new Error("Нет связи с сервером. Проверьте интернет и повторите.");
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      const detail = err.detail || res.statusText;
+      throw new Error(typeof detail === "string" ? detail : "Ошибка распознавания голоса");
+    }
+    return res.json();
+  },
   budgetStats: () =>
     request<{ by_category: { category: string; total: number }[]; total: number; forecast: number }>(
       "/dashboard/budget-stats"

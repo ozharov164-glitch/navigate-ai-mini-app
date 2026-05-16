@@ -5,9 +5,10 @@ import { getInitData } from "@/lib/telegram";
 interface Props {
   isPremium: boolean;
   onTheme: () => void;
+  theme?: "dark" | "light";
 }
 
-export function MorePage({ isPremium, onTheme }: Props) {
+export function MorePage({ isPremium, onTheme, theme = "dark" }: Props) {
   const [privacy, setPrivacy] = useState<{ stored_items: string[]; retention_policy: string; encryption: string } | null>(null);
   const [places, setPlaces] = useState<{ id: number; name: string; address: string }[]>([]);
   const [digests, setDigests] = useState<{ id: number; type: string; content: string; date: string }[]>([]);
@@ -135,8 +136,8 @@ export function MorePage({ isPremium, onTheme }: Props) {
         </button>
       </section>
 
-      <button className="glass-btn w-full text-sm" onClick={onTheme}>
-        Переключить тему
+      <button type="button" className="glass-btn w-full text-sm" onClick={onTheme}>
+        {theme === "dark" ? "☀️ Светлая тема" : "🌙 Тёмная тема"}
       </button>
     </div>
   );
