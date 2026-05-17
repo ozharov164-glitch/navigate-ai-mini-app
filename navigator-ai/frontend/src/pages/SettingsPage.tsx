@@ -93,7 +93,7 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
   };
 
   return (
-    <div className="stagger-children space-y-4 pb-8">
+    <div className="space-y-4 pb-8">
       <h2 className="heading-display">Настройки</h2>
 
       <section id="premium-section" ref={premiumRef} className={cn("premium-card", !isPremium && "!border-mint/20")}>

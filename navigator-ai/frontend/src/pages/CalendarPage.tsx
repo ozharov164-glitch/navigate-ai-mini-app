@@ -2,6 +2,7 @@ import { Calendar, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Task } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/Modal";
@@ -74,16 +75,16 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
   }
 
   return (
-    <div className="stagger-children space-y-5 pb-2">
+    <div className="space-y-5 pb-2">
       <motion.div className="flex items-center justify-between gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h2 className="heading-display flex items-center gap-2">
           <Calendar className="h-5 w-5 text-mint" strokeWidth={1.75} />
           Календарь
         </h2>
-        <div className="flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-0.5 backdrop-blur-sm">
+        <div className="calendar-nav">
           <button
             type="button"
-            className="rounded-lg p-2 transition hover:bg-white/[0.06]"
+            className="calendar-nav-btn"
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
             aria-label="Предыдущий месяц"
           >
@@ -92,7 +93,7 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
           <span className="min-w-[120px] px-2 text-center text-sm font-medium capitalize text-primary">{monthLabel}</span>
           <button
             type="button"
-            className="rounded-lg p-2 transition hover:bg-white/[0.06]"
+            className="calendar-nav-btn"
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
             aria-label="Следующий месяц"
           >
@@ -153,7 +154,11 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
           {selected.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" })}
         </h3>
         {selectedTasks.length === 0 ? (
-          <p className="text-sm text-muted">Нет задач — нажмите на день в сетке</p>
+          <EmptyState
+            title="Нет задач на этот день"
+            description="Выберите другой день или добавьте задачу через поле ввода на «Сегодня»"
+            hint="Календарь синхронизируется с AI"
+          />
         ) : (
           <ul className="relative space-y-0">
             {selectedTasks.map((t, idx) => (

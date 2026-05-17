@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ShoppingBag, TrendingUp, Wallet } from "lucide-react";
 import { api, type Expense } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/Toast";
@@ -68,7 +69,7 @@ export function BudgetPage({ isPremium: _premium, onRefresh: _refresh }: Props =
   if (!stats) return null;
 
   return (
-    <div className="stagger-children space-y-4 pb-2">
+    <div className="space-y-4 pb-2">
       <h2 className="heading-display flex items-center gap-2">
         <Wallet className="h-5 w-5 text-mint" />
         Бюджет
@@ -146,7 +147,11 @@ export function BudgetPage({ isPremium: _premium, onRefresh: _refresh }: Props =
           Транзакции
         </p>
         {expenses.length === 0 ? (
-          <p className="text-sm text-muted">Расходов пока нет — отправьте фото чека боту</p>
+          <EmptyState
+            title="Нет расходов"
+            description="Отправьте фото чека или напишите сумму — AI добавит в бюджет"
+            hint="Фото · текст · голос"
+          />
         ) : (
           <ul className="relative space-y-0">
             {expenses.map((e, idx) => (

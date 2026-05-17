@@ -29,7 +29,7 @@ export function HomePage({ data, onRefresh, isPremium }: Props) {
   };
 
   return (
-    <div className="stagger-children space-y-5 pb-4">
+    <div className="space-y-5 pb-4">
       <InputBar onDone={onRefresh} isPremium={isPremium} busy={busy} onBusy={setBusy} />
 
       {data.db_insights.length > 0 && <DbInsights items={data.db_insights} />}
@@ -37,7 +37,11 @@ export function HomePage({ data, onRefresh, isPremium }: Props) {
       <section>
         <h3 className="section-label mb-3">Задачи на сегодня</h3>
         {data.tasks_today.length === 0 ? (
-          <EmptyState title="Чистый лист" description="Добавьте задачу текстом или голосом" />
+          <EmptyState
+            title="Чистый лист"
+            description="Опишите день одной фразой — AI разложит на задачи и напоминания"
+            hint="Текст · голос · фото чека"
+          />
         ) : (
           <ul className="space-y-2">
             {data.tasks_today.map((t) => (
@@ -71,7 +75,7 @@ export function HomePage({ data, onRefresh, isPremium }: Props) {
       )}
 
       {data.summary_latest && (
-        <p className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-xs leading-relaxed text-muted">
+        <p className="summary-snippet">
           {data.summary_latest}
         </p>
       )}

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { Sparkles, Sun, Moon } from "lucide-react";
 import { api, type Dashboard } from "@/lib/api";
 import { applyTheme, resolveInitialTheme, watchTelegramTheme, type AppTheme } from "@/lib/theme";
 import { hapticLight, initTelegram } from "@/lib/telegram";
@@ -12,7 +13,6 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { HomePage } from "@/pages/HomePage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { SettingsPage } from "@/pages/SettingsPage";
-import { VoiceFab } from "@/components/VoiceFab";
 
 const BudgetPage = lazy(() => import("@/pages/BudgetPage").then((m) => ({ default: m.BudgetPage })));
 
@@ -58,6 +58,7 @@ export default function App() {
   }, []);
 
   const onTab = (t: Tab) => {
+    if (t === tab) return;
     hapticLight();
     setTab(t);
     if (t !== "settings") setSettingsScroll(null);
@@ -83,22 +84,19 @@ export default function App() {
   if (loading) return <LoadingScreen />;
   if (error && !data) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <motion.div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-red-400">{error}</p>
         <button type="button" className="btn-primary" onClick={load}>
           Повторить
         </button>
-      </div>
+      </motion.div>
     );
   }
 
-  const headerBg =
-    theme === "light" ? "border-slate-200/80 bg-white/92" : "border-white/[0.05] bg-midnight-900/88";
-
   return (
-    <div className="mx-auto min-h-screen max-w-lg pb-32 animate-fade-in">
-      <header className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-2xl ${headerBg}`}>
-        <div className="flex items-center justify-between">
+    <div className="app-root mx-auto min-h-screen max-w-lg pb-28">
+      <header className="app-header sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-2xl">
+        <motion.div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-mint/20 bg-mint/10 shadow-glow-sm">
               <Sparkles className="h-4 w-4 text-mint" strokeWidth={1.75} />
@@ -113,16 +111,16 @@ export default function App() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="glass-btn flex h-10 w-10 items-center justify-center !p-0 text-base"
+              className="glass-btn flex h-10 w-10 items-center justify-center !p-0"
               aria-label="Переключить тему"
             >
-              {theme === "dark" ? "☀️" : "🌙"}
+              {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-mint" />}
             </button>
           </div>
-        </div>
+        </motion.div>
       </header>
 
-      {data && (
+      {data && tab === "home" && (
         <ValueBanner
           minutes={data.saved_minutes_today}
           rub={data.saved_rub_today}
@@ -167,7 +165,6 @@ export default function App() {
         </PageShell>
       </main>
 
-      {tab === "home" && <VoiceFab onDone={load} isPremium={data?.is_premium ?? false} />}
       <BottomNav tab={tab} onChange={onTab} />
     </div>
   );
