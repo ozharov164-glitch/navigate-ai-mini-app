@@ -172,7 +172,7 @@ class AIService:
             try:
                 parsed = _extract_json(content)
                 result = AIAnalysisResponse.model_validate(parsed)
-                if result.summary or result.tasks or result.expenses or result.routes:
+                if result.summary or result.tasks or result.expenses or result.reminders:
                     return result
                 last_error = "Пустой результат"
             except (json.JSONDecodeError, ValidationError) as exc:

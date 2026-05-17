@@ -24,7 +24,7 @@ class ContextBuilder:
         tasks = (
             await session.execute(
                 select(Task)
-                .where(Task.user_id == user.id, Task.completed.is_(False))
+                .where(Task.user_id == user.id, Task.completed.is_(False), Task.archived.is_(False))
                 .order_by(Task.due_date.nulls_last(), Task.created_at.desc())
                 .limit(5)
             )
@@ -45,10 +45,7 @@ class ContextBuilder:
         reminders_today = [t for t in tasks if t.due_date and _same_day(t.due_date, today)]
         reminders_tomorrow = [t for t in tasks if t.due_date and _same_day(t.due_date, tomorrow)]
         lines.append(f"На сегодня: {len(reminders_today)}, на завтра: {len(reminders_tomorrow)}")
-        lines.append(
-            f"Метрики дня: сэкономлено {user.saved_minutes_today} мин, {user.saved_rub_today} ₽. "
-            f"Streak: {user.streak_count or 0} дн., XP: {user.xp or 0}."
-        )
+        lines.append(f"Метрики дня: сэкономлено {user.saved_minutes_today} мин, {user.saved_rub_today} ₽.")
         lines.append(
             "Составь детальный план: утро (3 пункта), день (3), вечер (2). "
             "Укажи приоритеты high/medium и рекомендуемое время. Только JSON tasks + summary."

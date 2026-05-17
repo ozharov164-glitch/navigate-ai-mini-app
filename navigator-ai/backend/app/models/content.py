@@ -1,10 +1,9 @@
-"""Задачи, расходы, маршруты, напоминания и vault."""
+"""Задачи, расходы, напоминания и vault."""
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, String, Text, func
 from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +20,8 @@ class Task(Base):
     due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -37,23 +38,6 @@ class Expense(Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     expense_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     receipt_path: Mapped[str] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class Route(Base):
-    __tablename__ = "routes"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    from_address: Mapped[str] = mapped_column(String(500))
-    to_address: Mapped[str] = mapped_column(String(500))
-    transport_mode: Mapped[str] = mapped_column(String(20), default="auto")
-    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=True)
-    distance_km: Mapped[float] = mapped_column(Float, nullable=True)
-    traffic_level: Mapped[str] = mapped_column(String(50), nullable=True)
-    static_map_url: Mapped[str] = mapped_column(Text, nullable=True)
-    yandex_maps_url: Mapped[str] = mapped_column(Text, nullable=True)
-    route_data: Mapped[dict] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -74,7 +58,7 @@ class Digest(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    digest_type: Mapped[str] = mapped_column(String(20))  # morning, evening, weekly
+    digest_type: Mapped[str] = mapped_column(String(20))  # morning, evening
     content: Mapped[str] = mapped_column(Text)
     insights: Mapped[list] = mapped_column(JSON, nullable=True)
     digest_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
@@ -87,7 +71,7 @@ class DocumentVault(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(255))
-    doc_type: Mapped[str] = mapped_column(String(50))  # policy, ticket, receipt, other
+    doc_type: Mapped[str] = mapped_column(String(50))
     file_path: Mapped[str] = mapped_column(String(500))
     expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
     notes_encrypted: Mapped[str] = mapped_column(Text, nullable=True)
@@ -105,26 +89,13 @@ class SmartInsight(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class UserTemplate(Base):
-    """Персональные шаблоны пользователя (без LLM при сохранении)."""
-    __tablename__ = "user_templates"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str] = mapped_column(String(100))
-    prompt: Mapped[str] = mapped_column(Text)
-    template_key: Mapped[str] = mapped_column(String(30), nullable=True)  # day_plan | null
-    icon: Mapped[str] = mapped_column(String(20), default="sparkles")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
 class ActionLog(Base):
     __tablename__ = "action_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     action_type: Mapped[str] = mapped_column(String(50))
-    input_type: Mapped[str] = mapped_column(String(20))  # voice, photo, text, location
+    input_type: Mapped[str] = mapped_column(String(20))
     raw_summary: Mapped[str] = mapped_column(Text, nullable=True)
     ai_response: Mapped[dict] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

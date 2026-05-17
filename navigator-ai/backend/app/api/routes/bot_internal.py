@@ -165,9 +165,6 @@ async def process_message(
         async with aiofiles.open(receipt_path, "wb") as f:
             await f.write(content)
 
-    if input_type == "location" and latitude and longitude:
-        text = (text or "") + f" Геопозиция: {latitude}, {longitude}"
-
     try:
         result = await action_processor.process_message(
             db,
@@ -176,8 +173,6 @@ async def process_message(
             voice_transcript=voice_transcript,
             photo_description=photo_description,
             photo_base64=photo_base64,
-            latitude=latitude,
-            longitude=longitude,
             template=template,
             input_type=input_type,
             receipt_path=receipt_path,
@@ -193,7 +188,6 @@ async def process_message(
         "summary": result.summary,
         "tasks_count": len(result.tasks),
         "expenses_count": len(result.expenses),
-        "routes_count": len(result.routes),
         "reminders_count": len(result.reminders),
         "insights": result.smart_insights,
         "saved_minutes": user.saved_minutes_today,

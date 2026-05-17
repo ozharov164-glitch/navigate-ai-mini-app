@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { api, type Dashboard } from "@/lib/api";
 import { applyTheme, resolveInitialTheme, watchTelegramTheme, type AppTheme } from "@/lib/theme";
-import { updateVisitStreak } from "@/lib/streak";
 import { hapticLight, initTelegram } from "@/lib/telegram";
 import { BottomNav } from "@/components/BottomNav";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -12,13 +11,12 @@ import { PremiumBadge } from "@/components/PremiumBadge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { HomePage } from "@/pages/HomePage";
 import { CalendarPage } from "@/pages/CalendarPage";
-import { RoutesPage } from "@/pages/RoutesPage";
-import { MorePage } from "@/pages/MorePage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { VoiceFab } from "@/components/VoiceFab";
 
 const BudgetPage = lazy(() => import("@/pages/BudgetPage").then((m) => ({ default: m.BudgetPage })));
 
-export type Tab = "home" | "calendar" | "budget" | "routes" | "more";
+export type Tab = "home" | "calendar" | "budget" | "settings";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("home");
@@ -26,8 +24,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<AppTheme>("dark");
-  const [moreScroll, setMoreScroll] = useState<"premium" | "privacy" | null>(null);
-  const [streak, setStreak] = useState(1);
+  const [settingsScroll, setSettingsScroll] = useState<"premium" | "privacy" | null>(null);
 
   const load = async () => {
     try {
@@ -37,7 +34,6 @@ export default function App() {
       const next = resolveInitialTheme(d.theme);
       setTheme(next);
       applyTheme(next);
-      setStreak(d.gamification?.streak ?? updateVisitStreak());
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ошибка загрузки";
       setError(msg === "Load failed" || msg === "Failed to fetch" ? "Нет связи с сервером" : msg);
@@ -51,8 +47,8 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const page = params.get("page");
     if (page === "privacy" || page === "premium") {
-      setTab("more");
-      setMoreScroll(page);
+      setTab("settings");
+      setSettingsScroll(page);
     }
     load();
     return watchTelegramTheme((t) => {
@@ -64,12 +60,12 @@ export default function App() {
   const onTab = (t: Tab) => {
     hapticLight();
     setTab(t);
-    if (t !== "more") setMoreScroll(null);
+    if (t !== "settings") setSettingsScroll(null);
   };
 
   const goPremium = () => {
-    setTab("more");
-    setMoreScroll("premium");
+    setTab("settings");
+    setSettingsScroll("premium");
     setTimeout(() => document.getElementById("premium-section")?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
@@ -97,9 +93,7 @@ export default function App() {
   }
 
   const headerBg =
-    theme === "light"
-      ? "border-slate-200/80 bg-white/92"
-      : "border-white/[0.05] bg-midnight-900/88";
+    theme === "light" ? "border-slate-200/80 bg-white/92" : "border-white/[0.05] bg-midnight-900/88";
 
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-32 animate-fade-in">
@@ -136,16 +130,18 @@ export default function App() {
           left={data.daily_actions_left}
           limit={data.daily_actions_limit}
           used={data.daily_actions_used}
-          streak={data.gamification?.streak ?? streak}
-          level={data.gamification?.level ?? 1}
           onUpgrade={goPremium}
         />
       )}
 
       <main className="px-4 py-3">
         <PageShell tabKey={tab}>
-          {tab === "home" && data && <HomePage data={data} onRefresh={load} />}
-          {tab === "calendar" && <CalendarPage tasks={data?.tasks_today ?? []} />}
+          {tab === "home" && data && (
+            <HomePage data={data} onRefresh={load} isPremium={data.is_premium} />
+          )}
+          {tab === "calendar" && (
+            <CalendarPage tasks={[...(data?.tasks_today ?? []), ...(data?.tasks_completed_today ?? [])]} />
+          )}
           {tab === "budget" && (
             <Suspense
               fallback={
@@ -155,23 +151,23 @@ export default function App() {
                 </div>
               }
             >
-              <BudgetPage />
+              <BudgetPage isPremium={data?.is_premium ?? false} onRefresh={load} />
             </Suspense>
           )}
-          {tab === "routes" && <RoutesPage routes={data?.routes_recent ?? []} />}
-          {tab === "more" && (
-            <MorePage
+          {tab === "settings" && (
+            <SettingsPage
               isPremium={data?.is_premium ?? false}
+              timezone={data?.timezone ?? "Europe/Moscow"}
               onTheme={toggleTheme}
               theme={theme}
-              scrollTo={moreScroll}
+              scrollTo={settingsScroll}
               onRefresh={load}
             />
           )}
         </PageShell>
       </main>
 
-      <VoiceFab onDone={load} isPremium={data?.is_premium ?? false} />
+      {tab === "home" && <VoiceFab onDone={load} isPremium={data?.is_premium ?? false} />}
       <BottomNav tab={tab} onChange={onTab} />
     </div>
   );

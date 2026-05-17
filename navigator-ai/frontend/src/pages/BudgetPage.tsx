@@ -26,7 +26,12 @@ function categoryIcon(cat: string) {
   return "💳";
 }
 
-export function BudgetPage() {
+interface Props {
+  isPremium?: boolean;
+  onRefresh?: () => void;
+}
+
+export function BudgetPage({ isPremium: _premium, onRefresh: _refresh }: Props = {}) {
   const { showToast } = useToast();
   const [stats, setStats] = useState<{ by_category: { category: string; total: number }[]; total: number; forecast: number } | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);

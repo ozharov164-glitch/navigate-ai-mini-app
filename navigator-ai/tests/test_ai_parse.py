@@ -6,7 +6,7 @@ from backend.app.services.ai_service import _extract_json, _safe_analysis
 
 
 def test_extract_json_from_markdown():
-    raw = '```json\n{"summary": "ok", "tasks": [], "expenses": [], "routes": [], "reminders": [], "smart_insights": []}\n```'
+    raw = '```json\n{"summary": "ok", "tasks": [], "expenses": [], "reminders": [], "smart_insights": []}\n```'
     data = _extract_json(raw)
     assert data["summary"] == "ok"
 
@@ -15,7 +15,6 @@ def test_safe_analysis_valid():
     parsed = {
         "tasks": [{"title": "Купить молоко", "priority": "medium"}],
         "expenses": [],
-        "routes": [],
         "reminders": [],
         "summary": "Добавлена задача",
         "smart_insights": ["tip"],

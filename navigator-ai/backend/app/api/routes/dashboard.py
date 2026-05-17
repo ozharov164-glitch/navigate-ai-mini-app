@@ -1,124 +1,90 @@
 """Dashboard и CRUD для Mini App."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from sqlalchemy import func, select
+import pytz
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.api.deps import get_current_user, get_export_user
+from backend.app.api.deps import get_current_user
 from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
-from backend.app.core.security import decrypt_sensitive
+from backend.app.core.uploads import read_upload_limited
 from backend.app.models.content import (
     ActionLog,
     Digest,
     DocumentVault,
     Expense,
     Reminder,
-    Route,
     SmartInsight,
     Task,
-    UserTemplate,
 )
-from backend.app.models.user import User, UserPlace
+from backend.app.models.user import User
 from backend.app.schemas.dashboard import (
     AnalyzeIn,
     DashboardOut,
     DbInsightOut,
-    DocumentOut,
+    ExpenseIn,
     ExpenseOut,
-    GamificationOut,
-    AchievementOut,
     InsightOut,
-    PlaceIn,
-    PlaceOut,
     PrivacyInfo,
     ReminderOut,
-    RouteOut,
     TaskOut,
     TaskUpdate,
     UserSettingsUpdate,
-    UserTemplateIn,
-    UserTemplateOut,
 )
-from backend.app.services.gamification_service import gamification_service
-from backend.app.services.product_insights_service import product_insights_service
-from backend.app.core.uploads import read_upload_limited
 from backend.app.services.action_processor import action_processor
-from backend.app.services.osrm_maps import osrm_maps
+from backend.app.services.product_insights_service import product_insights_service
 from backend.app.services.user_service import user_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 settings = get_settings()
 
 
-def _route_provider(route: Route) -> str:
-    """Провайдер маршрута из route_data JSON."""
-    if route.route_data and isinstance(route.route_data, dict):
-        p = route.route_data.get("provider", "")
-        if route.route_data.get("fallback"):
-            return "fallback"
-        if p in ("yandex", "osrm"):
-            return p
-    return "fallback"
-
-
-def _route_out(route: Route) -> RouteOut:
-    out = RouteOut.model_validate(route)
-    provider = _route_provider(route)
-    maps_url = out.yandex_maps_url
-    static_url = out.static_map_url
-
-    rd = route.route_data if isinstance(route.route_data, dict) else {}
-    from_g, to_g = rd.get("from"), rd.get("to")
-    if from_g and to_g and "lat" in from_g and "lon" in from_g:
-        maps_url = osrm_maps.yandex_maps_link(from_g, to_g)
-        static_url = osrm_maps.proxy_map_url(from_g, to_g)
-    elif out.static_map_url and "openstreetmap.de" in (out.static_map_url or ""):
-        # старые записи с битым URL — пересобрать превью если есть координаты
-        if from_g and to_g:
-            static_url = osrm_maps.proxy_map_url(from_g, to_g)
-
-    return out.model_copy(
-        update={
-            "route_provider": provider,
-            "yandex_maps_url": maps_url,
-            "static_map_url": static_url,
-        }
-    )
-
-
-@router.get("/map-preview")
-async def map_preview(
-    fl: float,
-    fo: float,
-    tl: float,
-    tol: float,
-    user: User = Depends(get_export_user),
-):
-    """Прокси превью карты (OSM). Auth: заголовок или ?init= для <img src>."""
-    _ = user
-    try:
-        body, ctype = await osrm_maps.fetch_static_preview(fl, fo, tl, tol)
-        return Response(content=body, media_type=ctype, headers={"Cache-Control": "public, max-age=3600"})
-    except RuntimeError as exc:
-        raise HTTPException(503, str(exc)) from exc
+def _user_today_bounds(user: User) -> tuple[datetime, datetime]:
+    """Границы «сегодня» в UTC по часовому поясу пользователя."""
+    tz = pytz.timezone(user.timezone or settings.default_timezone)
+    local_now = datetime.now(tz)
+    start_local = datetime.combine(local_now.date(), time.min, tzinfo=tz)
+    end_local = datetime.combine(local_now.date(), time.max, tzinfo=tz)
+    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
 
 @router.get("", response_model=DashboardOut)
 async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+    day_start, day_end = _user_today_bounds(user)
+    month_start = date.today().replace(day=1)
 
-    tasks = (
+    tasks_today = (
         await db.execute(
             select(Task)
-            .where(Task.user_id == user.id, Task.completed.is_(False))
-            .order_by(Task.due_date.nulls_last(), Task.created_at.desc())
+            .where(
+                Task.user_id == user.id,
+                Task.archived.is_(False),
+                Task.completed.is_(False),
+                or_(Task.due_date.is_(None), Task.due_date <= day_end),
+            )
+            .order_by(Task.due_date.nulls_last(), Task.priority.desc(), Task.created_at.desc())
+            .limit(30)
+        )
+    ).scalars().all()
+
+    tasks_completed_today = (
+        await db.execute(
+            select(Task)
+            .where(
+                Task.user_id == user.id,
+                Task.completed.is_(True),
+                Task.archived.is_(False),
+                Task.completed_at.isnot(None),
+                Task.completed_at >= day_start,
+                Task.completed_at <= day_end,
+            )
+            .order_by(Task.completed_at.desc())
             .limit(20)
         )
     ).scalars().all()
 
-    month_start = date.today().replace(day=1)
     expenses = (
         await db.execute(
             select(Expense)
@@ -128,18 +94,12 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         )
     ).scalars().all()
 
-    routes = (
-        await db.execute(
-            select(Route).where(Route.user_id == user.id).order_by(Route.created_at.desc()).limit(10)
-        )
-    ).scalars().all()
-
     insights = (
         await db.execute(
             select(SmartInsight)
             .where(SmartInsight.user_id == user.id)
             .order_by(SmartInsight.created_at.desc())
-            .limit(10)
+            .limit(5)
         )
     ).scalars().all()
 
@@ -152,98 +112,25 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         )
     ).scalar_one_or_none()
 
-    is_premium = user_service.is_premium(user)
-    limit = user_service.daily_limit(user)
-    used = user_service.daily_actions_used(user)
-    left = user_service.daily_actions_left(user)
-
-    g = await gamification_service.build_profile(db, user)
     db_insights = await product_insights_service.build(db, user)
-    templates = (
-        await db.execute(
-            select(UserTemplate)
-            .where(UserTemplate.user_id == user.id)
-            .order_by(UserTemplate.created_at.desc())
-            .limit(10)
-        )
-    ).scalars().all()
 
     return DashboardOut(
-        tasks_today=[TaskOut.model_validate(t) for t in tasks],
+        tasks_today=[TaskOut.model_validate(t) for t in tasks_today],
+        tasks_completed_today=[TaskOut.model_validate(t) for t in tasks_completed_today],
         expenses_month=[ExpenseOut.model_validate(e) for e in expenses],
-        routes_recent=[_route_out(r) for r in routes],
         insights=[InsightOut.model_validate(i) for i in insights],
         db_insights=[DbInsightOut.model_validate(i) for i in db_insights],
-        gamification=GamificationOut(
-            streak=g["streak"],
-            level=g["level"],
-            xp=g["xp"],
-            xp_in_level=g["xp_in_level"],
-            xp_to_next=g["xp_to_next"],
-            achievements=[AchievementOut.model_validate(a) for a in g["achievements"]],
-            tasks_completed=g["tasks_completed"],
-            ai_actions_total=g["ai_actions_total"],
-        ),
         summary_latest=last_log.raw_summary if last_log else None,
         saved_minutes_today=user.saved_minutes_today,
         saved_rub_today=user.saved_rub_today,
         tier=user.tier,
-        daily_actions_left=left,
-        daily_actions_limit=limit,
-        daily_actions_used=used,
-        is_premium=is_premium,
+        daily_actions_left=user_service.daily_actions_left(user),
+        daily_actions_limit=user_service.daily_limit(user),
+        daily_actions_used=user_service.daily_actions_used(user),
+        is_premium=user_service.is_premium(user),
         theme=user.theme or "dark",
-        user_templates=[UserTemplateOut.model_validate(t) for t in templates],
+        timezone=user.timezone or settings.default_timezone,
     )
-
-
-@router.get("/templates", response_model=list[UserTemplateOut])
-async def list_templates(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (
-        await db.execute(
-            select(UserTemplate).where(UserTemplate.user_id == user.id).order_by(UserTemplate.created_at.desc())
-        )
-    ).scalars().all()
-    return [UserTemplateOut.model_validate(t) for t in rows]
-
-
-@router.post("/templates", response_model=UserTemplateOut)
-async def create_template(
-    body: UserTemplateIn,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    count = (
-        await db.execute(select(func.count(UserTemplate.id)).where(UserTemplate.user_id == user.id))
-    ).scalar() or 0
-    if count >= 15:
-        raise HTTPException(400, "Максимум 15 шаблонов")
-    t = UserTemplate(
-        user_id=user.id,
-        title=body.title.strip(),
-        prompt=body.prompt.strip(),
-        template_key=body.template_key,
-        icon=body.icon or "sparkles",
-    )
-    db.add(t)
-    await db.flush()
-    return UserTemplateOut.model_validate(t)
-
-
-@router.delete("/templates/{template_id}")
-async def delete_template(
-    template_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    t = (
-        await db.execute(
-            select(UserTemplate).where(UserTemplate.id == template_id, UserTemplate.user_id == user.id)
-        )
-    ).scalar_one_or_none()
-    if t:
-        await db.delete(t)
-    return {"ok": True}
 
 
 @router.post("/analyze")
@@ -256,8 +143,7 @@ async def analyze_text(
         raise HTTPException(429, user_service.limit_message(user))
     try:
         return await action_processor.process_message(
-            db, user, text=body.text, template=body.template,
-            latitude=body.latitude, longitude=body.longitude, input_type="text",
+            db, user, text=body.text, template=body.template, input_type="text"
         )
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
@@ -285,7 +171,46 @@ async def analyze_voice(
         raise HTTPException(503, str(exc)) from exc
 
 
-@router.patch("/tasks/{task_id}")
+@router.post("/analyze-photo")
+async def analyze_photo(
+    file: UploadFile = File(...),
+    text: str | None = Form(None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not user_service.can_use_multimedia(user):
+        raise HTTPException(403, user_service.multimedia_denied_message())
+    if not await user_service.check_daily_limit(db, user):
+        raise HTTPException(429, user_service.limit_message(user))
+    import base64
+    from pathlib import Path
+
+    import aiofiles
+
+    content, filename = await read_upload_limited(file, kind="image")
+    from backend.app.services.ai_service import ai_service
+
+    photo_description = await ai_service.describe_photo(content)
+    photo_base64 = base64.b64encode(content).decode()
+    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+    receipt_path = str(Path(settings.upload_dir) / f"{user.id}_{filename}")
+    async with aiofiles.open(receipt_path, "wb") as f:
+        await f.write(content)
+    try:
+        return await action_processor.process_message(
+            db,
+            user,
+            text=text or photo_description,
+            photo_description=photo_description,
+            photo_base64=photo_base64,
+            input_type="photo",
+            receipt_path=receipt_path,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.patch("/tasks/{task_id}", response_model=TaskOut)
 async def update_task(
     task_id: int,
     body: TaskUpdate,
@@ -296,10 +221,10 @@ async def update_task(
     if not task:
         raise HTTPException(404, "Задача не найдена")
     if body.completed is not None:
-        was_done = task.completed
         task.completed = body.completed
-        if body.completed and not was_done:
-            gamification_service.add_task_xp(user)
+        task.completed_at = datetime.now(timezone.utc) if body.completed else None
+    if body.archived is not None:
+        task.archived = body.archived
     if body.title:
         task.title = body.title
     return TaskOut.model_validate(task)
@@ -307,38 +232,52 @@ async def update_task(
 
 @router.get("/tasks", response_model=list[TaskOut])
 async def list_tasks(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Task).where(Task.user_id == user.id).order_by(Task.created_at.desc()).limit(100))).scalars().all()
+    rows = (
+        await db.execute(
+            select(Task)
+            .where(Task.user_id == user.id, Task.archived.is_(False))
+            .order_by(Task.created_at.desc())
+            .limit(200)
+        )
+    ).scalars().all()
     return [TaskOut.model_validate(t) for t in rows]
 
 
 @router.get("/expenses", response_model=list[ExpenseOut])
 async def list_expenses(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Expense).where(Expense.user_id == user.id).order_by(Expense.expense_date.desc()).limit(200))).scalars().all()
+    rows = (
+        await db.execute(
+            select(Expense).where(Expense.user_id == user.id).order_by(Expense.expense_date.desc()).limit(200)
+        )
+    ).scalars().all()
     return [ExpenseOut.model_validate(e) for e in rows]
 
 
-@router.get("/routes", response_model=list[RouteOut])
-async def list_routes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Route).where(Route.user_id == user.id).order_by(Route.created_at.desc()).limit(50))).scalars().all()
-    return [_route_out(r) for r in rows]
+@router.post("/expenses", response_model=ExpenseOut)
+async def create_expense(
+    body: ExpenseIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    exp = Expense(
+        user_id=user.id,
+        amount=body.amount,
+        category=body.category.strip(),
+        merchant=body.merchant,
+        description=body.description,
+        expense_date=body.expense_date or date.today(),
+    )
+    db.add(exp)
+    await db.flush()
+    return ExpenseOut.model_validate(exp)
 
 
 @router.get("/reminders", response_model=list[ReminderOut])
 async def list_reminders(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Reminder).where(Reminder.user_id == user.id).order_by(Reminder.remind_at))).scalars().all()
+    rows = (
+        await db.execute(select(Reminder).where(Reminder.user_id == user.id).order_by(Reminder.remind_at))
+    ).scalars().all()
     return [ReminderOut.model_validate(r) for r in rows]
-
-
-@router.get("/documents", response_model=list[DocumentOut])
-async def list_documents(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(DocumentVault).where(DocumentVault.user_id == user.id).order_by(DocumentVault.created_at.desc()))).scalars().all()
-    return [DocumentOut.model_validate(d) for d in rows]
-
-
-@router.get("/digests")
-async def list_digests(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Digest).where(Digest.user_id == user.id).order_by(Digest.created_at.desc()).limit(30))).scalars().all()
-    return [{"id": d.id, "type": d.digest_type, "content": d.content, "insights": d.insights, "date": str(d.digest_date)} for d in rows]
 
 
 @router.get("/budget-stats")
@@ -350,70 +289,43 @@ async def budget_stats(user: User = Depends(get_current_user), db: AsyncSession 
     )
     by_category = [{"category": r[0], "total": float(r[1])} for r in result.all()]
     total = sum(c["total"] for c in by_category)
-    forecast = total * 1.1  # простой прогноз +10%
-    return {"by_category": by_category, "total": total, "forecast": forecast}
-
-
-@router.get("/places", response_model=list[PlaceOut])
-async def list_places(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    places = await user_service.get_places_decrypted(db, user.id)
-    result = await db.execute(select(UserPlace).where(UserPlace.user_id == user.id))
-    out = []
-    for p, dec in zip(result.scalars().all(), places):
-        out.append(PlaceOut(id=p.id, name=p.name, address=dec["address"], lat=p.lat, lon=p.lon))
-    return out
-
-
-@router.post("/places", response_model=PlaceOut)
-async def add_place(body: PlaceIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    place = await user_service.add_place(db, user.id, body.name, body.address, body.lat, body.lon)
-    return PlaceOut(id=place.id, name=place.name, address=body.address, lat=place.lat, lon=place.lon)
-
-
-@router.delete("/places/{place_id}")
-async def delete_place(place_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    place = (await db.execute(select(UserPlace).where(UserPlace.id == place_id, UserPlace.user_id == user.id))).scalar_one_or_none()
-    if place:
-        await db.delete(place)
-    return {"ok": True}
+    return {"by_category": by_category, "total": total, "forecast": total * 1.1}
 
 
 @router.patch("/settings")
-async def update_settings(body: UserSettingsUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_settings(
+    body: UserSettingsUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     if body.theme:
         user.theme = body.theme
     if body.timezone:
-        user.timezone = body.timezone
+        try:
+            pytz.timezone(body.timezone)
+            user.timezone = body.timezone
+        except pytz.UnknownTimeZoneError:
+            raise HTTPException(400, "Неизвестный часовой пояс") from None
     if body.proactive_enabled is not None:
         user.proactive_enabled = body.proactive_enabled
-    return {
-        "ok": True,
-        "theme": user.theme,
-    }
+    return {"ok": True, "theme": user.theme, "timezone": user.timezone, "proactive_enabled": user.proactive_enabled}
 
 
 @router.get("/privacy", response_model=PrivacyInfo)
 async def privacy_info():
     return PrivacyInfo(
         stored_items=[
-            "Задачи, расходы, маршруты, напоминания",
-            "Фото документов (зашифрованные заметки)",
-            "Адреса «Мои места» (шифрование Fernet)",
-            "Логи AI-анализа (JSON, без сырого голоса после обработки)",
+            "Задачи, расходы, напоминания",
+            "Фото документов (на вашем VPS)",
+            "Логи AI-анализа (JSON, без сырого голоса)",
         ],
-        retention_policy="Данные хранятся на вашем VPS до удаления. Резервные копии — по вашей политике.",
-        encryption="AES-256 (Fernet) для адресов и чувствительных полей",
+        retention_policy="Данные хранятся на вашем VPS до удаления.",
+        encryption="AES-256 (Fernet) для чувствительных полей",
     )
 
 
 @router.delete("/privacy/delete-all")
 async def delete_all(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    from sqlalchemy import delete
-    from backend.app.models.content import ActionLog, Digest, DocumentVault, Expense, Reminder, Route, SmartInsight, Task
-    from backend.app.models.user import UserPlace
-
     uid = user.id
-    for model in (Task, Expense, Route, Reminder, SmartInsight, ActionLog, Digest, DocumentVault, UserPlace):
+    for model in (Task, Expense, Reminder, SmartInsight, ActionLog, Digest, DocumentVault):
         await db.execute(delete(model).where(model.user_id == uid))
     user.daily_actions_count = 0
     user.saved_minutes_today = 0

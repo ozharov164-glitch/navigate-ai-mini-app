@@ -1,4 +1,4 @@
-import { Calendar, Home, MapPin, MoreHorizontal, Wallet } from "lucide-react";
+import { Calendar, Home, Settings, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Tab } from "@/App";
 import { cn } from "@/lib/utils";
@@ -12,13 +12,17 @@ const items: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Сегодня", icon: Home },
   { id: "calendar", label: "Календарь", icon: Calendar },
   { id: "budget", label: "Бюджет", icon: Wallet },
-  { id: "routes", label: "Маршруты", icon: MapPin },
-  { id: "more", label: "Ещё", icon: MoreHorizontal },
+  { id: "settings", label: "Настройки", icon: Settings },
 ];
 
 export function BottomNav({ tab, onChange }: Props) {
   return (
-    <div className="nav-dock-wrap">
+    <motion.div
+      className="nav-dock-wrap"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+    >
       <nav className="nav-dock" aria-label="Основная навигация">
         {items.map(({ id, label, icon: Icon }) => {
           const active = tab === id;
@@ -27,29 +31,27 @@ export function BottomNav({ tab, onChange }: Props) {
               key={id}
               type="button"
               onClick={() => onChange(id)}
-              className={cn("nav-item min-w-[52px] flex-1", active && "active")}
+              className={cn("nav-item min-w-[56px] flex-1", active && "active")}
               aria-current={active ? "page" : undefined}
-              whileTap={{ scale: 0.92 }}
+              whileTap={{ scale: 0.94 }}
             >
               <span className="nav-icon-wrap relative">
                 {active && (
                   <motion.span
                     layoutId="nav-glow"
-                    className="absolute inset-0 rounded-xl bg-mint/15"
+                    className="absolute inset-0 rounded-xl bg-mint/12"
                     transition={{ type: "spring", stiffness: 380, damping: 28 }}
                   />
                 )}
-                <Icon
-                  className={cn("relative h-[18px] w-[18px]", active && "scale-105")}
-                  strokeWidth={active ? 2.25 : 1.65}
-                />
+                <Icon className="relative h-[18px] w-[18px]" strokeWidth={active ? 2.2 : 1.65} />
               </span>
-              <span className={cn("truncate transition-colors", active && "font-semibold")}>{label}</span>
-              <span className="nav-pill" aria-hidden />
+              <span className={cn("truncate text-[10px] transition-colors", active && "font-semibold text-mint")}>
+                {label}
+              </span>
             </motion.button>
           );
         })}
       </nav>
-    </div>
+    </motion.div>
   );
 }

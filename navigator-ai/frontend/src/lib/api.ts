@@ -1,6 +1,5 @@
 import { getInitData } from "./telegram";
 
-/** Базовый URL API всегда с суффиксом /api (VITE_API_URL может быть с доменом или без). */
 export function apiBase(): string {
   const raw = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
   if (raw.endsWith("/api")) return raw;
@@ -33,30 +32,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail || res.statusText;
-    if (res.status === 401) {
-      throw new Error(typeof detail === "string" ? detail : "Требуется авторизация Telegram");
-    }
     throw new Error(typeof detail === "string" ? detail : "Ошибка запроса");
   }
   return res.json();
-}
-
-export interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  unlocked: boolean;
-}
-
-export interface Gamification {
-  streak: number;
-  level: number;
-  xp: number;
-  xp_in_level: number;
-  xp_to_next: number;
-  achievements: Achievement[];
-  tasks_completed: number;
-  ai_actions_total: number;
 }
 
 export interface DbInsight {
@@ -68,11 +46,10 @@ export interface DbInsight {
 
 export interface Dashboard {
   tasks_today: Task[];
+  tasks_completed_today: Task[];
   expenses_month: Expense[];
-  routes_recent: Route[];
   insights: Insight[];
   db_insights: DbInsight[];
-  gamification: Gamification | null;
   summary_latest: string | null;
   saved_minutes_today: number;
   saved_rub_today: number;
@@ -82,14 +59,13 @@ export interface Dashboard {
   daily_actions_used: number;
   is_premium: boolean;
   theme: "dark" | "light";
-  user_templates?: UserTemplate[];
+  timezone: string;
 }
 
 export interface AnalyzeResult {
   summary: string;
   tasks: unknown[];
   expenses: unknown[];
-  routes: unknown[];
   reminders: unknown[];
   smart_insights: string[];
 }
@@ -101,6 +77,8 @@ export interface Task {
   due_date: string | null;
   priority: string;
   completed: boolean;
+  archived?: boolean;
+  completed_at?: string | null;
   created_at: string;
 }
 
@@ -112,27 +90,6 @@ export interface Expense {
   expense_date: string;
 }
 
-export interface Route {
-  id: number;
-  from_address: string;
-  to_address: string;
-  duration_minutes: number | null;
-  distance_km?: number | null;
-  static_map_url: string | null;
-  yandex_maps_url: string | null;
-  traffic_level: string | null;
-  route_provider?: string | null;
-}
-
-export interface UserTemplate {
-  id: number;
-  title: string;
-  prompt: string;
-  template_key: string | null;
-  icon: string;
-  created_at: string;
-}
-
 export interface Insight {
   id: number;
   insight: string;
@@ -140,43 +97,65 @@ export interface Insight {
   is_read: boolean;
 }
 
+export const TIMEZONES = [
+  "Europe/Moscow",
+  "Europe/Kaliningrad",
+  "Europe/Samara",
+  "Asia/Yekaterinburg",
+  "Asia/Omsk",
+  "Asia/Krasnoyarsk",
+  "Asia/Irkutsk",
+  "Asia/Yakutsk",
+  "Asia/Vladivostok",
+  "Asia/Kamchatka",
+  "UTC",
+  "Europe/London",
+  "Europe/Berlin",
+  "America/New_York",
+  "Asia/Dubai",
+  "Asia/Tokyo",
+];
+
 export const api = {
   dashboard: () => request<Dashboard>("/dashboard"),
   tasks: () => request<Task[]>("/dashboard/tasks"),
-  toggleTask: (id: number, completed: boolean) =>
-    request<Task>(`/dashboard/tasks/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ completed }),
-    }),
+  updateTask: (id: number, body: { completed?: boolean; archived?: boolean }) =>
+    request<Task>(`/dashboard/tasks/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   analyze: (text: string, template?: string) =>
     request<AnalyzeResult>("/dashboard/analyze", {
       method: "POST",
       body: JSON.stringify({ text, template }),
     }),
-
   analyzeVoice: async (blob: Blob, filename = "voice.webm"): Promise<AnalyzeResult> => {
     const initData = getInitData();
-    if (!initData) {
-      throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
-    }
+    if (!initData) throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
     const form = new FormData();
     form.append("file", blob, filename);
-
-    let res: Response;
-    try {
-      res = await fetch(`${API}/dashboard/analyze-voice`, {
-        method: "POST",
-        headers: { "X-Telegram-Init-Data": initData },
-        body: form,
-      });
-    } catch {
-      throw new Error("Нет связи с сервером. Проверьте интернет и повторите.");
-    }
-
+    const res = await fetch(`${API}/dashboard/analyze-voice`, {
+      method: "POST",
+      headers: { "X-Telegram-Init-Data": initData },
+      body: form,
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
-      const detail = err.detail || res.statusText;
-      throw new Error(typeof detail === "string" ? detail : "Ошибка распознавания голоса");
+      throw new Error(typeof err.detail === "string" ? err.detail : "Ошибка распознавания");
+    }
+    return res.json();
+  },
+  analyzePhoto: async (file: File, text?: string): Promise<AnalyzeResult> => {
+    const initData = getInitData();
+    if (!initData) throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
+    const form = new FormData();
+    form.append("file", file);
+    if (text) form.append("text", text);
+    const res = await fetch(`${API}/dashboard/analyze-photo`, {
+      method: "POST",
+      headers: { "X-Telegram-Init-Data": initData },
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(typeof err.detail === "string" ? err.detail : "Ошибка анализа фото");
     }
     return res.json();
   },
@@ -184,31 +163,21 @@ export const api = {
     request<{ by_category: { category: string; total: number }[]; total: number; forecast: number }>(
       "/dashboard/budget-stats"
     ),
-  routes: () => request<Route[]>("/dashboard/routes"),
-  documents: () => request<{ id: number; title: string; doc_type: string; expiry_date: string | null }[]>("/dashboard/documents"),
-  digests: () => request<{ id: number; type: string; content: string; date: string }[]>("/dashboard/digests"),
-  places: () => request<{ id: number; name: string; address: string }[]>("/dashboard/places"),
-  addPlace: (name: string, address: string) =>
-    request("/dashboard/places", { method: "POST", body: JSON.stringify({ name, address }) }),
-  privacy: () => request<{ stored_items: string[]; retention_policy: string; encryption: string }>("/dashboard/privacy"),
+  addExpense: (body: { amount: number; category: string; merchant?: string; description?: string }) =>
+    request<Expense>("/dashboard/expenses", { method: "POST", body: JSON.stringify(body) }),
+  expenses: () => request<Expense[]>("/dashboard/expenses"),
+  reminders: () => request<{ id: number; title: string; remind_at: string; sent: boolean }[]>("/dashboard/reminders"),
+  privacy: () =>
+    request<{ stored_items: string[]; retention_policy: string; encryption: string; server_location: string }>(
+      "/dashboard/privacy"
+    ),
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
-  updateSettings: (payload: { theme?: string }) =>
+  updateSettings: (payload: { theme?: string; timezone?: string; proactive_enabled?: boolean }) =>
     request("/dashboard/settings", { method: "PATCH", body: JSON.stringify(payload) }),
-  createTemplate: (title: string, prompt: string, templateKey?: string) =>
-    request<UserTemplate>("/dashboard/templates", {
-      method: "POST",
-      body: JSON.stringify({ title, prompt, template_key: templateKey ?? null }),
-    }),
-  deleteTemplate: (id: number) => request(`/dashboard/templates/${id}`, { method: "DELETE" }),
-  /** Скачивание файла экспорта с авторизацией initData */
   downloadExport: async (path: "/export/ical" | "/export/pdf", filename: string) => {
     const initData = getInitData();
-    if (!initData) {
-      throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
-    }
-    const res = await fetch(`${API}${path}`, {
-      headers: { "X-Telegram-Init-Data": initData },
-    });
+    if (!initData) throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
+    const res = await fetch(`${API}${path}`, { headers: { "X-Telegram-Init-Data": initData } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(typeof err.detail === "string" ? err.detail : "Ошибка экспорта");
@@ -221,7 +190,6 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
-  expenses: () => request<Expense[]>("/dashboard/expenses"),
   starsInvoice: (tier: string) =>
     request<{ invoice_url: string }>("/payments/stars-invoice", { method: "POST", body: JSON.stringify({ tier }) }),
   yookassa: (tier: string) =>

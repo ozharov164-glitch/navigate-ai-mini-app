@@ -1,7 +1,7 @@
-"""Фоновый worker: proactive-дайджесты и напоминания."""
+"""Фоновый worker: напоминания и тихие дайджесты (timezone-aware)."""
 import asyncio
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import httpx
 import pytz
@@ -10,9 +10,8 @@ from sqlalchemy import select
 from backend.app.core.config import get_settings
 from backend.app.core.database import async_session
 from backend.app.core.redis_client import cache_set_nx
-from backend.app.models.content import Digest, Reminder, Route, Task
+from backend.app.models.content import Digest, Reminder, Task
 from backend.app.models.user import User
-from backend.app.services.ai_service import ai_service
 
 settings = get_settings()
 logging.basicConfig(level=logging.INFO)
@@ -27,16 +26,46 @@ async def send_telegram_message(chat_id: int, text: str) -> None:
         await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
 
 
-async def _digest_sent_today(session, user_id: int, digest_type: str) -> bool:
-    """Проверка: дайджест этого типа уже отправлен сегодня."""
+def _local_today(user: User) -> date:
+    tz = pytz.timezone(user.timezone or settings.default_timezone)
+    return datetime.now(tz).date()
+
+
+async def _digest_sent_on(session, user_id: int, digest_type: str, on_date: date) -> bool:
     existing = await session.execute(
         select(Digest.id).where(
             Digest.user_id == user_id,
             Digest.digest_type == digest_type,
-            Digest.digest_date == date.today(),
+            Digest.digest_date == on_date,
         ).limit(1)
     )
     return existing.scalar_one_or_none() is not None
+
+
+async def _has_digest_worthy_tasks(session, user: User) -> tuple[bool, list[Task]]:
+    """Новые или просроченные задачи — повод для дайджеста."""
+    tz = pytz.timezone(user.timezone or settings.default_timezone)
+    local_today = datetime.now(tz).date()
+    end_of_today = datetime.combine(local_today, time.max, tzinfo=tz).astimezone(timezone.utc)
+
+    rows = (
+        await session.execute(
+            select(Task).where(
+                Task.user_id == user.id,
+                Task.archived.is_(False),
+                Task.completed.is_(False),
+            ).limit(20)
+        )
+    ).scalars().all()
+
+    worthy: list[Task] = []
+    for t in rows:
+        if t.due_date is None:
+            worthy.append(t)
+            continue
+        if t.due_date <= end_of_today:
+            worthy.append(t)
+    return len(worthy) > 0, worthy
 
 
 async def morning_digest() -> None:
@@ -48,23 +77,23 @@ async def morning_digest() -> None:
             if now.hour != settings.morning_digest_hour:
                 continue
 
-            if await _digest_sent_today(session, user.id, "morning"):
+            local_date = now.date()
+            if await _digest_sent_on(session, user.id, "morning", local_date):
                 continue
 
-            redis_key = f"digest:morning:{user.id}:{date.today().isoformat()}"
+            has_tasks, tasks = await _has_digest_worthy_tasks(session, user)
+            if not has_tasks:
+                continue
+
+            redis_key = f"digest:morning:{user.id}:{local_date.isoformat()}"
             if not await cache_set_nx(redis_key, ttl=90000):
                 continue
 
-            tasks = (
-                await session.execute(
-                    select(Task).where(Task.user_id == user.id, Task.completed.is_(False)).limit(10)
-                )
-            ).scalars().all()
-            task_lines = "\n".join(f"• {t.title}" for t in tasks) or "Задач на сегодня нет — отличный день!"
-            text = f"☀️ <b>Утренний дайджест НавигаторAI</b>\n\n{task_lines}\n\n📱 Открой дашборд в Mini App"
+            task_lines = "\n".join(f"• {t.title}" for t in tasks[:8])
+            text = f"☀️ <b>Утро · НавигаторAI</b>\n\n{task_lines}\n\nОткройте Mini App"
             await send_telegram_message(user.telegram_id, text)
             session.add(
-                Digest(user_id=user.id, digest_type="morning", content=text, insights=[], digest_date=date.today())
+                Digest(user_id=user.id, digest_type="morning", content=text, insights=[], digest_date=local_date)
             )
         await session.commit()
 
@@ -78,45 +107,37 @@ async def evening_summary() -> None:
             if now.hour != settings.evening_summary_hour:
                 continue
 
-            if await _digest_sent_today(session, user.id, "evening"):
+            local_date = now.date()
+            if await _digest_sent_on(session, user.id, "evening", local_date):
                 continue
 
-            redis_key = f"digest:evening:{user.id}:{date.today().isoformat()}"
+            has_tasks, tasks = await _has_digest_worthy_tasks(session, user)
+            overdue = sum(
+                1
+                for t in tasks
+                if t.due_date and t.due_date.astimezone(tz).date() < local_date
+            )
+            if not has_tasks and overdue == 0:
+                continue
+
+            redis_key = f"digest:evening:{user.id}:{local_date.isoformat()}"
             if not await cache_set_nx(redis_key, ttl=90000):
                 continue
 
-            # Вечерний дайджест без LLM по умолчанию — не тратим OpenRouter на всех proactive-пользователей
-            if settings.ai_worker_evening_llm:
-                prompt = (
-                    f"Сегодня пользователь сэкономил {user.saved_minutes_today} мин и "
-                    f"{user.saved_rub_today} ₽. Краткий summary и 2 insight."
-                )
-                try:
-                    analysis = await ai_service.analyze(text=prompt, is_premium=True)
-                    insights = analysis.smart_insights
-                    summary = analysis.summary
-                except Exception:
-                    summary = "День завершён. Завтра — новые возможности!"
-                    insights = ["Отдыхайте — завтра продуктивнее с утренним планом"]
-            else:
-                summary = (
-                    f"Сегодня AI сэкономил вам {user.saved_minutes_today} мин "
-                    f"и {user.saved_rub_today} ₽."
-                )
-                insights = [
-                    "Завтра утром придёт дайджест с задачами",
-                    "Откройте Mini App — добавьте заметку голосом или текстом",
-                ]
-
-            text = f"🌙 <b>Вечерний итог</b>\n\n{summary}\n\n💡 " + "\n💡 ".join(insights[:3])
+            summary = (
+                f"Сегодня: {user.saved_minutes_today} мин и {user.saved_rub_today} ₽ учтено AI."
+            )
+            if overdue:
+                summary += f"\nПросрочено задач: {overdue}."
+            text = f"🌙 <b>Вечер · НавигаторAI</b>\n\n{summary}"
             await send_telegram_message(user.telegram_id, text)
             session.add(
                 Digest(
                     user_id=user.id,
                     digest_type="evening",
                     content=summary,
-                    insights=insights,
-                    digest_date=date.today(),
+                    insights=[],
+                    digest_date=local_date,
                 )
             )
         await session.commit()
@@ -126,54 +147,12 @@ async def check_reminders() -> None:
     async with async_session() as session:
         now = datetime.now(timezone.utc)
         reminders = (
-            await session.execute(
-                select(Reminder).where(Reminder.sent.is_(False), Reminder.remind_at <= now)
-            )
+            await session.execute(select(Reminder).where(Reminder.sent.is_(False), Reminder.remind_at <= now))
         ).scalars().all()
         for rem in reminders:
             user = (await session.execute(select(User).where(User.id == rem.user_id))).scalar_one()
-            await send_telegram_message(user.telegram_id, f"⏰ <b>Напоминание:</b> {rem.title}")
+            await send_telegram_message(user.telegram_id, f"⏰ <b>Напоминание</b>\n{rem.title}")
             rem.sent = True
-        await session.commit()
-
-
-async def traffic_alerts() -> None:
-    """Уведомления о пробках — не чаще одного раза в сутки на маршрут."""
-    async with async_session() as session:
-        routes = (
-            await session.execute(
-                select(Route).where(Route.traffic_level == "heavy").order_by(Route.created_at.desc()).limit(20)
-            )
-        ).scalars().all()
-        seen_users: set[int] = set()
-        today_str = date.today().isoformat()
-
-        for route in routes:
-            if route.user_id in seen_users:
-                continue
-
-            route_data = dict(route.route_data or {})
-            if route_data.get("traffic_alert_sent") == today_str:
-                continue
-
-            redis_key = f"traffic:{route.id}:{today_str}"
-            if not await cache_set_nx(redis_key, ttl=90000):
-                continue
-
-            seen_users.add(route.user_id)
-            user = (await session.execute(select(User).where(User.id == route.user_id))).scalar_one()
-            if not user.proactive_enabled:
-                continue
-
-            msg = (
-                f"🚗 Пробки на маршруте {route.from_address[:30]} → {route.to_address[:30]} "
-                f"(~{route.duration_minutes} мин)"
-            )
-            await send_telegram_message(user.telegram_id, msg)
-
-            route_data["traffic_alert_sent"] = today_str
-            route.route_data = route_data
-
         await session.commit()
 
 
@@ -184,7 +163,6 @@ async def run_loop() -> None:
             await check_reminders()
             await morning_digest()
             await evening_summary()
-            await traffic_alerts()
         except Exception:
             logger.exception("Worker cycle error")
         await asyncio.sleep(60)

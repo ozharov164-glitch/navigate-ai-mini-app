@@ -34,47 +34,29 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ai_model: str = "deepseek/deepseek-v3.2"
-    # Экономия OpenRouter: меньше токенов и дольше кэш
     ai_max_tokens: int = 2048
     ai_cache_ttl: int = 3600
     ai_json_retries: int = 2
     ai_json_retries_premium: int = 1
-    # Режим экономии: один vision на фото, без LLM в вечернем дайджесте, короткие fallback-цепочки
     ai_budget_mode: bool = True
     ai_worker_evening_llm: bool = False
     ai_vision_max_tokens: int = 800
     ai_transcribe_max_tokens: int = 512
     ai_system_prompt: str = (
-        "Ты — NavigAI, личный AI-навигатор. Отвечай ТОЛЬКО валидным JSON без markdown. "
-        'Схема: {"tasks":[{"title":"str","description":"str|null","due_date":"ISO8601|null",'
+        "Ты — НавигаторAI, тихий премиальный личный AI-оператор повседневной жизни. "
+        "Отвечай ТОЛЬКО валидным JSON без markdown. "
+        'Схема: {"tasks":[{"title":"str","description":"str|null","due_date":"ISO8601 UTC|null",'
         '"priority":"low|medium|high"}],"expenses":[{"amount":number,"category":"str",'
         '"merchant":"str|null","description":"str|null","currency":"RUB"}],'
-        '"routes":[{"from_address":"str","to_address":"str","transport_mode":"auto|transit|pedestrian"}],'
-        '"reminders":[{"title":"str","remind_at":"ISO8601"}],'
+        '"reminders":[{"title":"str","remind_at":"ISO8601 UTC"}],'
         '"summary":"краткий итог на русском","smart_insights":["строка"]}. '
-        "Если данных мало — пустые массивы и понятный summary."
+        "Все даты в UTC. Если данных мало — пустые массивы и понятный summary."
     )
 
-    # Публичный URL API (для превью карт в Mini App)
-    public_api_base: str = "https://31-128-42-170.sslip.io/api"
-
-    # Маршруты: публичный OSRM + Nominatim (нагрузка на VPS только кэш)
-    osrm_base_url: str = "https://router.project-osrm.org"
-    osrm_public_fallback: str = "https://routing.openstreetmap.de"
-    nominatim_url: str = "https://nominatim.openstreetmap.org"
-
-    # Яндекс отключён по умолчанию (оставлено для возможного включения env)
-    yandex_maps_api_key: str = ""
-    yandex_daily_limit: int = 800
-    yandex_static_disable_above: int = 700
-    yandex_static_map_enabled: bool = True
-
-    # Локальный Whisper (экономия OpenRouter ASR)
     whisper_enabled: bool = False
     whisper_url: str = "http://whisper:8000"
     whisper_model: str = "small"
 
-    # Голос и фото — только premium (freemium: текст)
     premium_only_multimedia: bool = True
 
     stars_basic_price: int = 199
@@ -86,7 +68,7 @@ class Settings(BaseSettings):
     yookassa_premium_price_rub: int = 399
 
     free_daily_actions: int = 10
-    premium_daily_actions: int = 50  # 0 = без soft-cap (не рекомендуется)
+    premium_daily_actions: int = 50
     referral_bonus_days: int = 14
 
     morning_digest_hour: int = 8

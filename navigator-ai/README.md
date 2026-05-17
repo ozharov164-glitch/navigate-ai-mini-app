@@ -1,6 +1,6 @@
 # НавигаторAI (@NavigAI_bot)
 
-Премиальный личный AI-навигатор: Telegram-бот + Mini App. Голос, фото, текст и геопозиция → задачи, расходы, маршруты, напоминания и smart insights.
+Тихий премиальный личный AI-оператор повседневной жизни. Голос, фото или текст → задачи, расходы и напоминания. Mini App + Telegram-бот.
 
 ## Архитектура (production)
 
@@ -10,80 +10,72 @@
 | API | https://31-128-42-170.sslip.io/api |
 | Bot | @NavigAI_bot |
 
-## Структура
+## Вкладки Mini App
 
-```
-navigator-ai/
-├── bot/                  # aiogram 3 (webhook)
-├── backend/              # FastAPI + SQLAlchemy + Alembic
-├── frontend/             # React 19 Mini App (GitHub Pages)
-├── tests/                # pytest
-├── alembic/
-├── docker-compose.prod.yml
-└── scripts/deploy-to-vps.sh
-```
+1. **Сегодня** — ввод, задачи, выполненные сегодня, insights из БД  
+2. **Календарь** — задачи по датам  
+3. **Бюджет** — расходы и категории  
+4. **Настройки** — часовой пояс, Premium, приватность, экспорт  
+
+## Стек
+
+- Backend: FastAPI, SQLAlchemy async, PostgreSQL, Redis, Alembic  
+- Bot: aiogram 3 (webhook)  
+- Frontend: React 19, Vite, Tailwind, shadcn/ui, Framer Motion  
+- AI: DeepSeek V3.2 через OpenRouter (JSON mode)  
+- Whisper: self-hosted (опционально, profile `whisper`)  
+
+## Лимиты AI
+
+- Free: 10 действий/день  
+- Premium: soft-cap 50/день (env `PREMIUM_DAILY_ACTIONS`)  
+- Без LLM при открытии вкладок — только при разборе ввода  
 
 ## Деплой
 
-См. [DEPLOY.md](../DEPLOY.md) в корне репозитория.
+См. [DEPLOY.md](../DEPLOY.md).
 
 ```bash
 export DEPLOY_PASS='...'
-./navigator-ai/scripts/deploy-to-vps.sh
+./scripts/deploy-to-vps.sh
 ```
+
+После обновления backend:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+Миграция `005_premium_minimal_v2`: archive задач, удаление routes/gamification.
 
 ## Локальная разработка
 
 ```bash
 cp .env.example .env
 docker compose up -d postgres redis backend
-python -m bot.main   # polling если WEBHOOK_URL пустой
+python -m bot.main
 
 cd frontend && npm install && VITE_API_URL=http://localhost:8000/api npm run dev
 ```
 
-## Тесты и линтер
+## Тесты
 
 ```bash
 pip install -r requirements.txt
 pytest tests/ -v
-ruff check backend bot tests
-black --check backend bot tests
 ```
 
 ## Переменные окружения
 
-См. [.env.example](.env.example). Обязательно в production:
+См. `.env.example`. Обязательно в production:
 
 - `WEBHOOK_SECRET`, `BOT_TOKEN`, `OPENROUTER_API_KEY`
-- `MINI_APP_URL` = URL GitHub Pages
-- `CORS_ORIGINS` = origin Pages + `https://web.telegram.org`
-- `ENCRYPTION_KEY` — валидный Fernet (44 символа base64)
+- `MINI_APP_URL`, `CORS_ORIGINS`
+- `ENCRYPTION_KEY` (Fernet, 44 символа base64)
 
-## Функции
-
-- DeepSeek V3.2 + Gemini (голос/фото), `AI_BUDGET_MODE` и Redis-кэш
-- **Лимиты:** free 10 AI/день, premium soft-cap 50/день (настраивается env)
-- Шаблоны day_plan / week_analysis — короткий контекст (top-5 из БД)
-- **Маршруты:** OSRM + OpenStreetMap (публичные API, без карт на VPS)
-- Геймификация: streak, XP, уровень, достижения; insights только из БД (без LLM)
-- Yandex daily cap + fallback при 403/429; Stars + YooKassa
-- Mini App: premium UI, «Умный день», шаринг карточки, confetti
-
-После деплоя backend: `alembic upgrade head` (миграция `002_gamification_routing`).
-
-## OpenRouter
-
-Рекомендуется выставить **monthly cap $25–30** в кабинете OpenRouter. На VPS смотреть токены:
+Опционально Whisper:
 
 ```bash
-docker compose -f docker-compose.prod.yml logs backend | grep -i openrouter
+docker compose -f docker-compose.prod.yml --profile whisper up -d whisper
+# WHISPER_ENABLED=true, WHISPER_URL=http://whisper:8000
 ```
-
-## Приватность
-
-Данные на вашем VPS. Удаление всех данных — Mini App → Приватность.
-
-## Лицензия
-
-Proprietary — НавигаторAI © 2026

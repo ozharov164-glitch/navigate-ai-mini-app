@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.models.content import Expense, Route, Task
+from backend.app.models.content import Expense, Task
 from backend.app.models.user import User
 from backend.app.services.user_service import user_service
 
@@ -16,14 +16,13 @@ class ProductInsightsService:
         month_start = today.replace(day=1)
         week_ago = today - timedelta(days=7)
 
-        # Топ категория расходов за месяц
         cat_rows = (
             await session.execute(
                 select(Expense.category, func.sum(Expense.amount).label("t"))
                 .where(Expense.user_id == user.id, Expense.expense_date >= month_start)
                 .group_by(Expense.category)
                 .order_by(func.sum(Expense.amount).desc())
-                .limit(3)
+                .limit(2)
             )
         ).all()
         if cat_rows:
@@ -36,23 +35,13 @@ class ProductInsightsService:
                     "icon": "wallet",
                 }
             )
-            if len(cat_rows) > 1:
-                second = cat_rows[1]
-                insights.append(
-                    {
-                        "id": "second_category",
-                        "title": "Вторая статья",
-                        "body": f"«{second[0]}» — {float(second[1]):,.0f} ₽".replace(",", " "),
-                        "icon": "chart",
-                    }
-                )
 
-        # Просроченные задачи
         overdue = (
             await session.execute(
                 select(func.count(Task.id)).where(
                     Task.user_id == user.id,
                     Task.completed.is_(False),
+                    Task.archived.is_(False),
                     Task.due_date.isnot(None),
                     Task.due_date < datetime.now(timezone.utc),
                 )
@@ -63,44 +52,27 @@ class ProductInsightsService:
                 {
                     "id": "overdue",
                     "title": "Просрочено",
-                    "body": f"{overdue} задач с прошедшим дедлайном — закройте или перенесите",
+                    "body": f"{overdue} задач с прошедшим дедлайном",
                     "icon": "alert",
                 }
             )
 
-        due_scheduled = (
+        completed_week = (
             await session.execute(
                 select(func.count(Task.id)).where(
                     Task.user_id == user.id,
-                    Task.completed.is_(False),
-                    Task.due_date.isnot(None),
+                    Task.completed.is_(True),
+                    Task.completed_at >= datetime.now(timezone.utc) - timedelta(days=7),
                 )
             )
         ).scalar() or 0
-        if due_scheduled:
+        if completed_week >= 3:
             insights.append(
                 {
-                    "id": "tasks_upcoming",
-                    "title": "Задачи впереди",
-                    "body": f"{due_scheduled} задач с дедлайном — откройте календарь",
-                    "icon": "calendar",
-                }
-            )
-
-        open_tasks = (
-            await session.execute(
-                select(func.count(Task.id)).where(
-                    Task.user_id == user.id, Task.completed.is_(False)
-                )
-            )
-        ).scalar() or 0
-        if open_tasks > 3:
-            insights.append(
-                {
-                    "id": "focus",
-                    "title": "Фокус дня",
-                    "body": f"{open_tasks} открытых задач — закройте 1–2 главные до вечера",
-                    "icon": "target",
+                    "id": "productive_week",
+                    "title": "Продуктивная неделя",
+                    "body": f"Закрыто {completed_week} задач за 7 дней",
+                    "icon": "check",
                 }
             )
 
@@ -116,45 +88,17 @@ class ProductInsightsService:
                 {
                     "id": "week_spend",
                     "title": "Неделя в цифрах",
-                    "body": f"За 7 дней учтено {float(week_sum):,.0f} ₽ расходов".replace(",", " "),
+                    "body": f"За 7 дней учтено {float(week_sum):,.0f} ₽".replace(",", " "),
                     "icon": "chart",
                 }
             )
 
-        routes_week = (
-            await session.execute(
-                select(func.count(Route.id)).where(
-                    Route.user_id == user.id,
-                    Route.created_at >= datetime.now(timezone.utc) - timedelta(days=7),
-                )
-            )
-        ).scalar() or 0
-        if routes_week:
-            insights.append(
-                {
-                    "id": "routes_week",
-                    "title": "Маршруты",
-                    "body": f"За неделю построено {routes_week} маршрутов",
-                    "icon": "map",
-                }
-            )
-
-        if user.streak_count and user.streak_count >= 2:
-            insights.append(
-                {
-                    "id": "streak",
-                    "title": "Серия дней",
-                    "body": f"Streak {user.streak_count} дней подряд — так держать!",
-                    "icon": "flame",
-                }
-            )
-
-        if not user_service.is_premium(user) and settings_premium_hint():
+        if not user_service.is_premium(user):
             insights.append(
                 {
                     "id": "premium_tip",
                     "title": "Premium",
-                    "body": "Голос, фото и 50 AI/день — в подписке Premium",
+                    "body": "Безлимит действий, PDF-экспорт и голосовые ответы AI",
                     "icon": "crown",
                 }
             )
@@ -164,7 +108,7 @@ class ProductInsightsService:
                 {
                     "id": "value_today",
                     "title": "Ценность сегодня",
-                    "body": f"AI сэкономил {user.saved_minutes_today} мин и учёл {user.saved_rub_today} ₽",
+                    "body": f"Сэкономлено {user.saved_minutes_today} мин и {user.saved_rub_today} ₽",
                     "icon": "sparkles",
                 }
             )
@@ -174,18 +118,12 @@ class ProductInsightsService:
                 {
                     "id": "tip_start",
                     "title": "С чего начать",
-                    "body": "Напишите боту задачу или нажмите «Умный день»",
+                    "body": "Отправьте текст, голос или фото — AI разложит по задачам и расходам",
                     "icon": "lightbulb",
                 }
             )
 
-        return insights[:8]
-
-
-def settings_premium_hint() -> bool:
-    from backend.app.core.config import get_settings
-
-    return get_settings().premium_only_multimedia
+        return insights[:6]
 
 
 product_insights_service = ProductInsightsService()
