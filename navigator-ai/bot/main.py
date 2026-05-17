@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from bot.config import settings
-from bot.handlers import commands, messages, payments
+from bot.handlers import commands, messages, owner_test, payments
 from bot.middlewares.private_only import PrivateChatOnlyMiddleware
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +22,7 @@ async def _build_dispatcher() -> tuple[Bot, Dispatcher]:
     dp = Dispatcher()
     dp.message.middleware(PrivateChatOnlyMiddleware())
     dp.include_router(commands.router)
+    dp.include_router(owner_test.router)
     dp.include_router(messages.router)
     dp.include_router(payments.router)
     return bot, dp

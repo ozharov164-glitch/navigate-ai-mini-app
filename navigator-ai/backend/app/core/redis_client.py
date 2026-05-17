@@ -46,6 +46,13 @@ async def cache_set(key: str, value: Any, ttl: int | None = None) -> None:
     await r.set(key, json.dumps(value, ensure_ascii=False), ex=ttl or settings.cache_ttl_seconds)
 
 
+async def cache_delete(key: str) -> None:
+    r = await get_redis()
+    if not r:
+        return
+    await r.delete(key)
+
+
 async def cache_delete_pattern(pattern: str) -> None:
     r = await get_redis()
     if not r:

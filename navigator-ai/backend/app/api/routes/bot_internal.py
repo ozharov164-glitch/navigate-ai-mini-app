@@ -14,7 +14,8 @@ from backend.app.core.uploads import read_upload_limited
 from backend.app.models.user import SubscriptionTier
 from backend.app.services.action_processor import action_processor
 from backend.app.services.ai_service import ai_service
-from backend.app.services.user_service import user_service
+from backend.app.services.owner_test_service import owner_test_service
+from backend.app.services.user_service import _is_premium, user_service
 
 router = APIRouter(prefix="/internal/bot", tags=["bot-internal"])
 settings = get_settings()
@@ -43,6 +44,11 @@ class ActivatePremiumBody(BaseModel):
     payment_ref: str | None = None
 
 
+class OwnerTestModeBody(BaseModel):
+    telegram_id: int
+    mode: str  # premium | free | auto
+
+
 @router.post("/ensure-user")
 async def ensure_user(body: BotUserEnsure, db: AsyncSession = Depends(get_db), _: None = Depends(_verify_bot_secret)):
     user = await user_service.get_or_create(
@@ -55,6 +61,7 @@ async def ensure_user(body: BotUserEnsure, db: AsyncSession = Depends(get_db), _
     if body.referral_code:
         referral_applied = await user_service.apply_referral(db, user, body.referral_code)
 
+    real_premium = _is_premium(user)
     return {
         "user_id": user.id,
         "referral_code": user.referral_code,
@@ -62,7 +69,38 @@ async def ensure_user(body: BotUserEnsure, db: AsyncSession = Depends(get_db), _
         "daily_left": user_service.daily_actions_left(user),
         "daily_limit": user_service.daily_limit(user),
         "referral_applied": referral_applied,
+        **owner_test_service.status_payload(user, real_premium),
     }
+
+
+@router.get("/owner-test-mode")
+async def get_owner_test_mode(
+    telegram_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(_verify_bot_secret),
+):
+    user = await user_service.get_or_create(db, telegram_id)
+    if not owner_test_service.is_owner(telegram_id):
+        raise HTTPException(403, "Только для владельца бота")
+    return owner_test_service.status_payload(user, _is_premium(user))
+
+
+@router.post("/owner-test-mode")
+async def set_owner_test_mode(
+    body: OwnerTestModeBody,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(_verify_bot_secret),
+):
+    user = await user_service.get_or_create(db, body.telegram_id)
+    if not owner_test_service.is_owner(body.telegram_id):
+        raise HTTPException(403, "Только для владельца бота")
+    try:
+        mode = await owner_test_service.set_mode(db, user, body.mode)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await db.commit()
+    logger.info("Owner test mode telegram_id=%s mode=%s", body.telegram_id, mode)
+    return owner_test_service.status_payload(user, _is_premium(user))
 
 
 @router.post("/activate-premium")

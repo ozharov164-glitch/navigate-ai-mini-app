@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,6 +38,7 @@ class User(Base):
     proactive_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     theme: Mapped[str] = mapped_column(String(10), default="dark")
     route_provider: Mapped[str] = mapped_column(String(10), default="auto")  # auto | yandex | osrm
+    premium_test_override: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # premium | free
     streak_count: Mapped[int] = mapped_column(Integer, default=0)
     streak_last_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     xp: Mapped[int] = mapped_column(Integer, default=0)

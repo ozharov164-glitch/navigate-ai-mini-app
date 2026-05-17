@@ -9,6 +9,7 @@ from backend.app.core.config import get_settings
 from backend.app.core.security import decrypt_sensitive, encrypt_sensitive
 from backend.app.models.user import Referral, SubscriptionTier, User, UserPlace
 from backend.app.services.gamification_service import gamification_service
+from backend.app.services.owner_test_service import owner_test_service
 
 settings = get_settings()
 
@@ -46,6 +47,9 @@ class UserService:
         return user
 
     def is_premium(self, user: User) -> bool:
+        override = owner_test_service.premium_override(user)
+        if override is not None:
+            return override
         return _is_premium(user)
 
     def can_use_multimedia(self, user: User) -> bool:

@@ -22,6 +22,26 @@ class BotApiClient:
           resp.raise_for_status()
           return resp.json()
 
+  async def get_owner_test_mode(self, telegram_id: int) -> dict[str, Any]:
+      async with httpx.AsyncClient(timeout=15.0) as client:
+          resp = await client.get(
+              f"{self.base}/api/internal/bot/owner-test-mode",
+              params={"telegram_id": telegram_id},
+              headers=self.headers,
+          )
+          resp.raise_for_status()
+          return resp.json()
+
+  async def set_owner_test_mode(self, telegram_id: int, mode: str) -> dict[str, Any]:
+      async with httpx.AsyncClient(timeout=15.0) as client:
+          resp = await client.post(
+              f"{self.base}/api/internal/bot/owner-test-mode",
+              json={"telegram_id": telegram_id, "mode": mode},
+              headers=self.headers,
+          )
+          resp.raise_for_status()
+          return resp.json()
+
   async def activate_premium(self, telegram_id: int, tier: str, payment_ref: str | None = None) -> dict[str, Any]:
       async with httpx.AsyncClient(timeout=30.0) as client:
           resp = await client.post(

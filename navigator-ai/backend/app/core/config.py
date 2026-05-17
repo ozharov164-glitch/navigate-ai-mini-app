@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     bot_token: str = ""
     bot_username: str = "NavigAI_bot"
+    bot_owner_telegram_id: int = 7595981350
     webhook_url: str = ""
     webhook_secret: str = ""
     mini_app_url: str = "https://ozharov164-glitch.github.io/navigate-ai-mini-app/"

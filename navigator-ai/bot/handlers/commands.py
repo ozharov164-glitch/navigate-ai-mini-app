@@ -4,6 +4,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot.config import settings
+from bot.handlers.owner_test import owner_test_button_row
 from bot.services.api_client import api_client
 from bot.utils.keyboard import mini_app_button
 
@@ -27,6 +28,9 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
     rows: list[list[InlineKeyboardButton]] = []
     if btn := mini_app_button("📱 Открыть дашборд"):
         rows.append([btn])
+    if message.from_user and message.from_user.id == settings.bot_owner_telegram_id:
+        if test_row := owner_test_button_row():
+            rows.append(test_row)
 
     ref_text = ""
     if referral:
@@ -59,7 +63,8 @@ async def cmd_help(message: Message) -> None:
         "💬 Текст — любая заметка\n"
         "📍 Геопозиция — маршруты с пробками\n\n"
         "/premium — подписка\n"
-        "/privacy — приватность данных",
+        "/privacy — приватность данных\n"
+        "/testmode — тест Premium/Free (владелец)",
         parse_mode="HTML",
     )
 
