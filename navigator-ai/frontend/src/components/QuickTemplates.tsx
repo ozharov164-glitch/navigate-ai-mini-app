@@ -13,8 +13,8 @@ const templates = [
     label: "Разобрать чек",
     desc: "Фото или текст чека",
     icon: Receipt,
-    gradient: "from-emerald-500/20 to-teal-500/5",
-    iconColor: "text-emerald-400",
+    glow: "group-hover:shadow-[0_0_28px_rgba(52,211,153,0.2)]",
+    iconBg: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   },
   {
     id: "day",
@@ -22,8 +22,8 @@ const templates = [
     label: "План дня",
     desc: "Оптимальный распорядок",
     icon: CalendarDays,
-    gradient: "from-cyan-500/20 to-blue-500/5",
-    iconColor: "text-cyan-400",
+    glow: "group-hover:shadow-[0_0_28px_rgba(0,229,201,0.22)]",
+    iconBg: "bg-mint/15 text-accent border-mint/25",
   },
   {
     id: "week",
@@ -31,8 +31,8 @@ const templates = [
     label: "Анализ недели",
     desc: "Задачи и расходы",
     icon: BarChart3,
-    gradient: "from-violet-500/20 to-purple-500/5",
-    iconColor: "text-violet-400",
+    glow: "group-hover:shadow-[0_0_28px_rgba(167,139,250,0.2)]",
+    iconBg: "bg-violet-500/15 text-violet-300 border-violet-500/20",
   },
 ] as const;
 
@@ -70,8 +70,8 @@ export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-      {templates.map((t) => {
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      {templates.map((t, i) => {
         const Icon = t.icon;
         const loading = busy === t.template;
         return (
@@ -80,21 +80,27 @@ export function QuickTemplates({ onDone, busy: externalBusy }: Props) {
             type="button"
             disabled={!!busy || externalBusy}
             onClick={() => run(t.template)}
+            whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: templates.indexOf(t) * 0.05 }}
+            transition={{ delay: i * 0.06, type: "spring", stiffness: 320 }}
             className={cn(
-              "glass-card-interactive flex items-start gap-3 p-3 text-left disabled:opacity-60",
-              `bg-gradient-to-br ${t.gradient}`
+              "group glass-card-interactive flex items-start gap-3 p-3.5 text-left disabled:opacity-50",
+              t.glow
             )}
           >
-            <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5", t.iconColor)}>
-              <Icon className="h-5 w-5" />
+            <span
+              className={cn(
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-shadow duration-300",
+                t.iconBg
+              )}
+            >
+              <Icon className="h-5 w-5" strokeWidth={1.75} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold text-primary">{loading ? "Обработка…" : t.label}</span>
-              <span className="mt-0.5 block text-[10px] text-muted">{t.desc}</span>
+              <span className="mt-0.5 block text-[10px] leading-snug text-muted">{t.desc}</span>
             </span>
           </motion.button>
         );

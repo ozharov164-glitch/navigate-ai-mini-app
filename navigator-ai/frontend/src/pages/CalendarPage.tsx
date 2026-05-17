@@ -1,4 +1,5 @@
 import { Calendar, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Task } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -12,9 +13,9 @@ interface Props {
 }
 
 const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-red-400",
-  medium: "bg-amber-400",
-  low: "bg-cyan-400",
+  high: "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.5)]",
+  medium: "bg-gold shadow-[0_0_6px_rgba(255,184,0,0.4)]",
+  low: "bg-mint shadow-[0_0_6px_rgba(0,229,201,0.35)]",
 };
 
 function sameDay(a: Date, b: Date) {
@@ -73,76 +74,107 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
   }
 
   return (
-    <div className="stagger-children space-y-4 pb-2">
-      <div className="flex items-center justify-between">
+    <div className="stagger-children space-y-5 pb-2">
+      <motion.div className="flex items-center justify-between gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h2 className="heading-display flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-accent" />
+          <Calendar className="h-5 w-5 text-mint" strokeWidth={1.75} />
           Календарь
         </h2>
-        <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-0.5">
-          <button type="button" className="rounded-lg p-2 transition hover:bg-white/10" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Предыдущий месяц">
+        <div className="flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-0.5 backdrop-blur-sm">
+          <button
+            type="button"
+            className="rounded-lg p-2 transition hover:bg-white/[0.06]"
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+            aria-label="Предыдущий месяц"
+          >
             <ChevronLeft className="h-4 w-4 text-secondary" />
           </button>
-          <span className="min-w-[130px] px-1 text-center text-sm font-medium capitalize text-primary">{monthLabel}</span>
-          <button type="button" className="rounded-lg p-2 transition hover:bg-white/10" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Следующий месяц">
+          <span className="min-w-[120px] px-2 text-center text-sm font-medium capitalize text-primary">{monthLabel}</span>
+          <button
+            type="button"
+            className="rounded-lg p-2 transition hover:bg-white/[0.06]"
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            aria-label="Следующий месяц"
+          >
             <ChevronRight className="h-4 w-4 text-secondary" />
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <Card padding="sm">
-        <div className="mb-2 grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted">
-          {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((w) => (
-            <span key={w}>{w}</span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-0.5">
-          {daysInMonth.map((day, i) => {
-            if (!day) return <div key={`e-${i}`} className="aspect-square" />;
-            const dayTasks = tasksOnDay(day);
-            const isSelected = sameDay(day, selected);
-            const isToday = sameDay(day, new Date());
-            const priorities = [...new Set(dayTasks.map((t) => t.priority || "low"))].slice(0, 3);
-            return (
-              <button
-                key={day.toISOString()}
-                type="button"
-                onClick={() => openDay(day)}
-                className={cn(
-                  "linear-day relative flex flex-col items-center justify-center",
-                  isSelected && "linear-day-selected font-semibold",
-                  !isSelected && "text-primary",
-                  isToday && "linear-day-today"
-                )}
-              >
-                <span>{day.getDate()}</span>
-                {priorities.length > 0 && (
-                  <span className="absolute bottom-1 flex gap-0.5">
-                    {priorities.map((p) => (
-                      <span key={p} className={cn("h-1 w-1 rounded-full", PRIORITY_DOT[p] || PRIORITY_DOT.low)} />
-                    ))}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      <Card padding="sm" className="calendar-shell !border-0 !bg-transparent !p-0 !shadow-none">
+        <div className="calendar-shell">
+          <motion.div
+            className="mb-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-muted"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((w) => (
+              <span key={w}>{w}</span>
+            ))}
+          </motion.div>
+          <div className="grid grid-cols-7 gap-1">
+            {daysInMonth.map((day, i) => {
+              if (!day) return <div key={`e-${i}`} className="aspect-square" />;
+              const dayTasks = tasksOnDay(day);
+              const isSelected = sameDay(day, selected);
+              const isToday = sameDay(day, new Date());
+              const priorities = [...new Set(dayTasks.map((t) => t.priority || "low"))].slice(0, 3);
+              return (
+                <motion.button
+                  key={day.toISOString()}
+                  type="button"
+                  onClick={() => openDay(day)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={cn(
+                    "linear-day relative flex flex-col items-center justify-center",
+                    isSelected && "linear-day-selected",
+                    !isSelected && "text-slate-400",
+                    isToday && "linear-day-today"
+                  )}
+                >
+                  <span className={cn(isSelected && "text-mint")}>{day.getDate()}</span>
+                  {priorities.length > 0 && (
+                    <span className="absolute bottom-1.5 flex gap-0.5">
+                      {priorities.map((p) => (
+                        <span key={p} className={cn("h-1 w-1 rounded-full", PRIORITY_DOT[p] || PRIORITY_DOT.low)} />
+                      ))}
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 
       <Card>
-        <h3 className="mb-2 text-sm font-semibold text-primary">
+        <h3 className="mb-3 text-sm font-semibold capitalize text-primary">
           {selected.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" })}
         </h3>
         {selectedTasks.length === 0 ? (
           <p className="text-sm text-muted">Нет задач — нажмите на день в сетке</p>
         ) : (
-          <ul className="space-y-2">
-            {selectedTasks.map((t) => (
-              <li key={t.id} className="flex gap-2 text-sm">
-                <span className="mono-time shrink-0">
-                  {t.due_date ? new Date(t.due_date).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                </span>
-                <span className={cn("text-secondary", t.completed && "line-through text-muted")}>{t.title}</span>
+          <ul className="relative space-y-0">
+            {selectedTasks.map((t, idx) => (
+              <li key={t.id} className="relative flex gap-3 py-2.5 pl-1">
+                {idx < selectedTasks.length - 1 && <span className="timeline-line" />}
+                <span
+                  className={cn(
+                    "relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-midnight",
+                    PRIORITY_DOT[t.priority] || PRIORITY_DOT.low
+                  )}
+                />
+                <motion.div className="min-w-0 flex-1" initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
+                  <span className="mono-time block">
+                    {t.due_date
+                      ? new Date(t.due_date).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })
+                      : "—"}
+                  </span>
+                  <span className={cn("mt-0.5 block text-sm text-secondary", t.completed && "line-through text-muted")}>
+                    {t.title}
+                  </span>
+                </motion.div>
               </li>
             ))}
           </ul>
@@ -158,7 +190,7 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
           )
         }
       >
-        <Download className="h-4 w-4" />
+        <Download className="h-4 w-4" strokeWidth={1.75} />
         Экспорт iCal
       </button>
 
@@ -171,7 +203,7 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
           ) : (
             <ul className="max-h-64 space-y-3 overflow-y-auto">
               {selectedTasks.map((t) => (
-                <li key={t.id} className="flex gap-3 border-b border-white/5 pb-2 last:border-0">
+                <li key={t.id} className="flex gap-3 border-b border-white/[0.06] pb-3 last:border-0">
                   <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[t.priority] || PRIORITY_DOT.low)} />
                   <div>
                     <p className={cn("font-medium text-primary", t.completed && "line-through text-muted")}>{t.title}</p>
@@ -193,3 +225,4 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
     </div>
   );
 }
+

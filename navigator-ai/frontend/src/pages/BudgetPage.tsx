@@ -5,7 +5,7 @@ import { api, type Expense } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/Toast";
-const COLORS = ["#22d3ee", "#34d399", "#f5c842", "#a78bfa", "#f472b6", "#fb923c"];
+const COLORS = ["#00E5C9", "#34d399", "#FFB800", "#a78bfa", "#5CEBD9", "#fb923c"];
 
 const CATEGORY_ICONS: Record<string, string> = {
   еда: "🍽",
@@ -65,7 +65,7 @@ export function BudgetPage() {
   return (
     <div className="stagger-children space-y-4 pb-2">
       <h2 className="heading-display flex items-center gap-2">
-        <Wallet className="h-5 w-5 text-accent" />
+        <Wallet className="h-5 w-5 text-mint" />
         Бюджет
       </h2>
 

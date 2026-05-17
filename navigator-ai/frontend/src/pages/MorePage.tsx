@@ -42,7 +42,7 @@ function SettingsSection({
   return (
     <Card className={className}>
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
-        <Icon className="h-4 w-4 text-accent" />
+        <Icon className="h-4 w-4 text-mint" />
         {title}
       </h2>
       {children}
@@ -174,21 +174,16 @@ export function MorePage({
       <section
         id="premium-section"
         ref={premiumRef}
-        className={cn(
-          "overflow-hidden rounded-2xl border p-4 shadow-card backdrop-blur-xl",
-          isPremium
-            ? "border-premium/40 bg-gradient-to-br from-amber-500/20 via-navy-900/90 to-navy-950"
-            : "border-cyan-400/20 bg-gradient-to-br from-cyan-500/10 via-navy-900/90 to-navy-950"
-        )}
+        className={cn("premium-card", !isPremium && "!border-mint/20")}
       >
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="flex items-center gap-2 text-base font-bold text-primary">
-              <Crown className={cn("h-5 w-5", isPremium ? "text-premium" : "text-accent")} />
+              <Crown className={cn("h-5 w-5", isPremium ? "text-gold" : "text-mint")} strokeWidth={1.75} />
               Premium
             </h2>
-            <p className="mt-1 text-xs text-muted">
-              {isPremium ? "Безлимит AI · PDF-отчёты · приоритет" : "199–399 Stars или ₽ · безлимит действий"}
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              {isPremium ? "50 AI/день · голос · фото · PDF" : "199–399 Stars · до 50 AI/день"}
             </p>
           </div>
           {isPremium && <PremiumBadge size="md" />}
@@ -196,13 +191,13 @@ export function MorePage({
         {!isPremium && (
           <ul className="mt-3 space-y-1.5 text-xs text-secondary">
             <li className="flex items-center gap-2">
-              <Sparkles className="h-3 w-3 text-accent" /> Безлимит AI-действий
+              <Sparkles className="h-3 w-3 text-mint" /> Безлимит AI-действий
             </li>
             <li className="flex items-center gap-2">
-              <FileText className="h-3 w-3 text-accent" /> PDF-отчёты
+              <FileText className="h-3 w-3 text-mint" /> PDF-отчёты
             </li>
             <li className="flex items-center gap-2">
-              <Shield className="h-3 w-3 text-accent" /> Больше попыток при разборе
+              <Shield className="h-3 w-3 text-mint" /> Больше попыток при разборе
             </li>
           </ul>
         )}
@@ -244,7 +239,7 @@ export function MorePage({
           <ul className="space-y-2">
             {docs.map((d) => (
               <li key={d.id} className="flex items-center gap-2 rounded-lg bg-white/[0.03] p-2 text-sm text-secondary">
-                <FileText className="h-4 w-4 shrink-0 text-accent" />
+                <FileText className="h-4 w-4 shrink-0 text-mint" />
                 {d.title} <span className="text-muted">({d.doc_type})</span>
               </li>
             ))}
@@ -258,7 +253,7 @@ export function MorePage({
         ) : (
           digests.slice(0, 5).map((d) => (
             <div key={d.id} className="mb-3 border-b border-white/5 pb-3 last:mb-0 last:border-0">
-              <span className="text-[10px] font-semibold uppercase text-accent">{d.type}</span>
+              <span className="text-[10px] font-semibold uppercase text-mint">{d.type}</span>
               <span className="text-[10px] text-muted"> · {d.date}</span>
               <p className="mt-1 text-xs leading-relaxed text-secondary">{d.content.slice(0, 140)}…</p>
             </div>
@@ -311,7 +306,7 @@ export function MorePage({
           </>
         ) : (
           <>
-            <Moon className="h-4 w-4 text-accent" /> Тёмная тема
+            <Moon className="h-4 w-4 text-mint" /> Тёмная тема
           </>
         )}
       </button>

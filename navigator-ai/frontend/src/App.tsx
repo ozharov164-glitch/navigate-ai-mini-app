@@ -98,19 +98,19 @@ export default function App() {
 
   const headerBg =
     theme === "light"
-      ? "border-slate-200/80 bg-white/90"
-      : "border-white/[0.06] bg-navy-900/85";
+      ? "border-slate-200/80 bg-white/92"
+      : "border-white/[0.05] bg-midnight-900/88";
 
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-32 animate-fade-in">
       <header className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-2xl ${headerBg}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 ring-1 ring-cyan-400/30">
-              <Sparkles className="h-4 w-4 text-accent" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-mint/20 bg-mint/10 shadow-glow-sm">
+              <Sparkles className="h-4 w-4 text-mint" strokeWidth={1.75} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-primary">НавигаторAI</h1>
+              <h1 className="text-base font-semibold tracking-tight text-primary">НавигаторAI</h1>
               <p className="font-mono text-[10px] text-muted">@NavigAI_bot</p>
             </div>
           </div>
@@ -119,7 +119,7 @@ export default function App() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm transition hover:bg-white/10 active:scale-95"
+              className="glass-btn flex h-10 w-10 items-center justify-center !p-0 text-base"
               aria-label="Переключить тему"
             >
               {theme === "dark" ? "☀️" : "🌙"}

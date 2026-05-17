@@ -97,7 +97,7 @@ export function VoiceFab({ onDone, isPremium = false }: Props) {
       <div className="fixed bottom-[4.75rem] left-1/2 z-40 -translate-x-1/2">
         {!recording && (
           <span
-            className="pointer-events-none absolute inset-0 animate-pulse-ring rounded-full bg-accent/30"
+            className="pointer-events-none absolute inset-0 animate-pulse-ring rounded-full bg-mint/30"
             aria-hidden
           />
         )}

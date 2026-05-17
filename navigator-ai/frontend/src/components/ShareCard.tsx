@@ -53,7 +53,7 @@ export function ShareCard({ minutes, rub, streak, level, achievements = [] }: Pr
         animate={{ opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 3, repeat: Infinity }}
       />
-      <p className="relative flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-accent">
+      <p className="relative flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-mint">
         <Sparkles className="h-3 w-3" />
         Поделиться
       </p>
@@ -82,7 +82,7 @@ export function ShareCard({ minutes, rub, streak, level, achievements = [] }: Pr
           </span>
         ))}
       </motion.div>
-      <span className="relative mt-3 flex items-center justify-center gap-2 text-xs font-medium text-accent">
+      <span className="relative mt-3 flex items-center justify-center gap-2 text-xs font-medium text-mint">
         <Share2 className="h-4 w-4" />
         Поделиться карточкой
       </span>

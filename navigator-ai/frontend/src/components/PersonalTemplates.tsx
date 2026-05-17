@@ -54,7 +54,7 @@ export function PersonalTemplates({ templates, busy, onRun, onRefresh }: Props) 
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-accent hover:bg-white/5"
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-mint hover:bg-white/5"
         >
           <Plus className="h-3 w-3" />
           {open ? "Отмена" : "Добавить"}

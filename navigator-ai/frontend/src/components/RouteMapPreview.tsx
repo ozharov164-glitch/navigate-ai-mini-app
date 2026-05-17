@@ -32,7 +32,7 @@ export function RouteMapPreview({ url, className }: { url: string; className?: s
       <div
         className={`relative flex h-44 items-center justify-center bg-gradient-to-br from-cyan-500/15 via-indigo-500/10 to-navy-900 ${className ?? ""}`}
       >
-        <MapPin className="h-10 w-10 text-accent/40" />
+        <MapPin className="h-10 w-10 text-mint/40" />
       </div>
     );
   }
