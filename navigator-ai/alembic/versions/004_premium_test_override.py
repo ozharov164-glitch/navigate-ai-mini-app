@@ -3,7 +3,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "004_premium_test_override"
-down_revision = "003_user_templates"
+down_revision = "003_templates"
 branch_labels = None
 depends_on = None
 
