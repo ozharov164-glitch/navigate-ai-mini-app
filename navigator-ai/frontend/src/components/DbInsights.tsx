@@ -25,7 +25,7 @@ export function DbInsights({ items }: Props) {
 
   return (
     <Card>
-      <p className="section-label mb-3">Insights (без AI)</p>
+      <p className="section-label mb-3">Из ваших данных</p>
       <ul className="space-y-2">
         {items.map((i, idx) => {
           const Icon = ICONS[i.icon] || Lightbulb;

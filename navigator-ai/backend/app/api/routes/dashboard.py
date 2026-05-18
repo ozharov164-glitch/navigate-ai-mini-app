@@ -19,7 +19,7 @@ from backend.app.models.content import (
     SmartInsight,
     Task,
 )
-from backend.app.models.user import User
+from backend.app.models.user import Referral, User
 from backend.app.schemas.dashboard import (
     AnalyzeIn,
     DashboardOut,
@@ -114,9 +114,23 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
 
     db_insights = await product_insights_service.build(db, user)
 
+    reminders_upcoming = (
+        await db.execute(
+            select(Reminder)
+            .where(Reminder.user_id == user.id, Reminder.sent.is_(False))
+            .order_by(Reminder.remind_at)
+            .limit(15)
+        )
+    ).scalars().all()
+
+    referrals_count = (
+        await db.execute(select(func.count()).select_from(Referral).where(Referral.referrer_id == user.id))
+    ).scalar() or 0
+
     return DashboardOut(
         tasks_today=[TaskOut.model_validate(t) for t in tasks_today],
         tasks_completed_today=[TaskOut.model_validate(t) for t in tasks_completed_today],
+        reminders_upcoming=[ReminderOut.model_validate(r) for r in reminders_upcoming],
         expenses_month=[ExpenseOut.model_validate(e) for e in expenses],
         insights=[InsightOut.model_validate(i) for i in insights],
         db_insights=[DbInsightOut.model_validate(i) for i in db_insights],
@@ -130,6 +144,9 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         is_premium=user_service.is_premium(user),
         theme=user.theme or "dark",
         timezone=user.timezone or settings.default_timezone,
+        proactive_enabled=user.proactive_enabled,
+        referral_code=user.referral_code,
+        referrals_count=int(referrals_count),
     )
 
 
@@ -280,16 +297,61 @@ async def list_reminders(user: User = Depends(get_current_user), db: AsyncSessio
     return [ReminderOut.model_validate(r) for r in rows]
 
 
+def _month_bounds(user: User, months_ago: int = 0) -> tuple[date, date]:
+    """Границы календарного месяца в локальной TZ пользователя."""
+    tz = pytz.timezone(user.timezone or settings.default_timezone)
+    local = datetime.now(tz).date()
+    y, m = local.year, local.month - months_ago
+    while m <= 0:
+        m += 12
+        y -= 1
+    start = date(y, m, 1)
+    if m == 12:
+        end = date(y + 1, 1, 1)
+    else:
+        end = date(y, m + 1, 1)
+    return start, end
+
+
 @router.get("/budget-stats")
 async def budget_stats(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Expense.category, func.sum(Expense.amount).label("total"))
-        .where(Expense.user_id == user.id)
-        .group_by(Expense.category)
-    )
-    by_category = [{"category": r[0], "total": float(r[1])} for r in result.all()]
-    total = sum(c["total"] for c in by_category)
-    return {"by_category": by_category, "total": total, "forecast": total * 1.1}
+    month_start, month_end = _month_bounds(user, 0)
+    prev_start, prev_end = _month_bounds(user, 1)
+
+    async def _sum_period(start: date, end: date) -> tuple[float, list[dict]]:
+        result = await db.execute(
+            select(Expense.category, func.sum(Expense.amount).label("total"))
+            .where(
+                Expense.user_id == user.id,
+                Expense.expense_date >= start,
+                Expense.expense_date < end,
+            )
+            .group_by(Expense.category)
+        )
+        by_category = [{"category": r[0], "total": float(r[1])} for r in result.all()]
+        total = sum(c["total"] for c in by_category)
+        return total, by_category
+
+    total, by_category = await _sum_period(month_start, month_end)
+    prev_total, _ = await _sum_period(prev_start, prev_end)
+
+    days_in_month = (month_end - month_start).days
+    tz = pytz.timezone(user.timezone or settings.default_timezone)
+    day_of_month = datetime.now(tz).day
+    forecast = (total / max(day_of_month, 1)) * days_in_month if day_of_month > 0 else total
+
+    delta_pct = None
+    if prev_total > 0:
+        delta_pct = round((total - prev_total) / prev_total * 100, 1)
+
+    return {
+        "by_category": by_category,
+        "total": total,
+        "prev_month_total": prev_total,
+        "delta_pct": delta_pct,
+        "forecast": round(forecast, 2),
+        "month_label": month_start.strftime("%B %Y"),
+    }
 
 
 @router.patch("/settings")

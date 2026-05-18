@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Crown, Download, FileText, Moon, Shield, Sparkles, Sun, Trash2 } from "lucide-react";
+import { Bell, Crown, Download, FileText, Gift, Moon, Shield, Sparkles, Sun, Trash2 } from "lucide-react";
 import { api, TIMEZONES } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/Modal";
@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
 interface Props {
   isPremium: boolean;
   timezone: string;
+  proactiveEnabled?: boolean;
+  referralCode?: string;
+  referralsCount?: number;
   onTheme: () => void;
   theme?: "dark" | "light";
   scrollTo?: "premium" | "privacy" | null;
@@ -29,18 +32,39 @@ function Section({ title, icon: Icon, children }: { title: string; icon: typeof 
   );
 }
 
-export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scrollTo, onRefresh }: Props) {
+const BOT_USERNAME = "NavigAI_bot";
+
+export function SettingsPage({
+  isPremium,
+  timezone,
+  proactiveEnabled = true,
+  referralCode = "",
+  referralsCount = 0,
+  onTheme,
+  theme = "dark",
+  scrollTo,
+  onRefresh,
+}: Props) {
   const { showToast } = useToast();
   const premiumRef = useRef<HTMLElement>(null);
   const privacyRef = useRef<HTMLElement>(null);
-  const [privacy, setPrivacy] = useState<{ stored_items: string[]; retention_policy: string; encryption: string } | null>(null);
+  const [privacy, setPrivacy] = useState<{ stored_items: string[]; retention_policy: string; encryption: string } | null>(
+    null
+  );
   const [tz, setTz] = useState(timezone);
+  const [proactive, setProactive] = useState(proactiveEnabled);
   const [payBusy, setPayBusy] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const referralLink = referralCode ? `https://t.me/${BOT_USERNAME}?start=ref_${referralCode}` : "";
 
   useEffect(() => {
     setTz(timezone);
   }, [timezone]);
+
+  useEffect(() => {
+    setProactive(proactiveEnabled);
+  }, [proactiveEnabled]);
 
   useEffect(() => {
     api.privacy().then(setPrivacy).catch(() => null);
@@ -51,12 +75,44 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
     if (scrollTo === "privacy") privacyRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [scrollTo]);
 
+  useEffect(() => {
+    const pending = sessionStorage.getItem("yk_payment");
+    if (!pending) return;
+    try {
+      const { tier, payment_id } = JSON.parse(pending) as { tier: string; payment_id: string };
+      api
+        .confirmYookassa(tier, payment_id)
+        .then(() => {
+          sessionStorage.removeItem("yk_payment");
+          showToast("Premium активирован", "success");
+          onRefresh?.();
+        })
+        .catch(() => {
+          /* webhook may have activated */
+          sessionStorage.removeItem("yk_payment");
+          onRefresh?.();
+        });
+    } catch {
+      sessionStorage.removeItem("yk_payment");
+    }
+  }, [onRefresh, showToast]);
+
   const saveTz = async (value: string) => {
     setTz(value);
     try {
       await api.updateSettings({ timezone: value });
       showToast("Часовой пояс сохранён", "success");
       onRefresh?.();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Ошибка", "error");
+    }
+  };
+
+  const saveProactive = async (value: boolean) => {
+    setProactive(value);
+    try {
+      await api.updateSettings({ proactive_enabled: value });
+      showToast(value ? "Дайджесты включены" : "Дайджесты выключены", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Ошибка", "error");
     }
@@ -84,11 +140,24 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
     setPayBusy(`yk_${tier}`);
     try {
       const data = await api.yookassa(tier);
+      sessionStorage.setItem("yk_payment", JSON.stringify({ tier, payment_id: data.payment_id }));
       window.open(data.confirmation_url, "_blank");
+      showToast("После оплаты вернитесь в Mini App", "info");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "YooKassa недоступна", "error");
     } finally {
       setPayBusy(null);
+    }
+  };
+
+  const shareReferral = () => {
+    if (!referralLink) return;
+    const text = `НавигаторAI — AI для задач и расходов. ${referralLink}`;
+    if (navigator.share) {
+      navigator.share({ title: "НавигаторAI", text, url: referralLink }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(referralLink);
+      showToast("Ссылка скопирована", "success");
     }
   };
 
@@ -104,7 +173,7 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
               Premium
             </h2>
             <p className="mt-1.5 text-xs text-muted">
-              {isPremium ? "50 AI/день · голос · фото · PDF" : "Безлимит действий · приоритетный разбор"}
+              {isPremium ? "До 50 AI/день · голос · фото · PDF" : "10 AI/день бесплатно · до 50 с Premium"}
             </p>
           </div>
           {isPremium && <PremiumBadge size="md" />}
@@ -112,13 +181,13 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
         {!isPremium && (
           <ul className="mt-3 space-y-1.5 text-xs text-secondary">
             <li className="flex items-center gap-2">
-              <Sparkles className="h-3 w-3 text-mint" /> До 50 AI-действий в день
+              <Sparkles className="h-3 w-3 text-mint" /> Голос и фото
             </li>
             <li className="flex items-center gap-2">
               <FileText className="h-3 w-3 text-mint" /> PDF-экспорт
             </li>
             <li className="flex items-center gap-2">
-              <Shield className="h-3 w-3 text-mint" /> Голос и фото · голосовые ответы AI
+              <Shield className="h-3 w-3 text-mint" /> Приоритетный AI-разбор
             </li>
           </ul>
         )}
@@ -132,6 +201,31 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
         </div>
       </section>
 
+      {referralCode && (
+        <Section title="Пригласить друга" icon={Gift}>
+          <p className="text-xs text-secondary">
+            Вы +14 дн. Premium · друг +7 дн. · приглашено: <b>{referralsCount}</b>
+          </p>
+          <button type="button" className="btn-primary mt-3 w-full text-xs" onClick={shareReferral}>
+            Поделиться ссылкой
+          </button>
+          <p className="mt-2 break-all font-mono text-[10px] text-muted">{referralLink}</p>
+        </Section>
+      )}
+
+      <Section title="Уведомления" icon={Bell}>
+        <label className="flex cursor-pointer items-center justify-between gap-3">
+          <span className="text-sm text-primary">Утренний и вечерний дайджест</span>
+          <input
+            type="checkbox"
+            checked={proactive}
+            onChange={(e) => saveProactive(e.target.checked)}
+            className="h-5 w-5 rounded accent-mint"
+          />
+        </label>
+        <p className="mt-2 text-[11px] text-muted">По вашему часовому поясу · только при важных задачах</p>
+      </Section>
+
       <Section title="Часовой пояс" icon={Sun}>
         <select className="input-field w-full" value={tz} onChange={(e) => saveTz(e.target.value)}>
           {TIMEZONES.map((z) => (
@@ -140,12 +234,15 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
             </option>
           ))}
         </select>
-        <p className="mt-2 text-[11px] text-muted">Напоминания и дайджесты — по вашему локальному времени</p>
       </Section>
 
       <Section title="Экспорт" icon={Download}>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="glass-btn text-xs" onClick={() => api.downloadExport("/export/ical", "navigai.ics").catch(() => showToast("Ошибка", "error"))}>
+          <button
+            type="button"
+            className="glass-btn text-xs"
+            onClick={() => api.downloadExport("/export/ical", "navigai.ics").catch(() => showToast("Ошибка", "error"))}
+          >
             iCal
           </button>
           <button
@@ -172,7 +269,6 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
                 ))}
               </ul>
               <p className="mt-2 text-xs text-secondary">{privacy.retention_policy}</p>
-              <p className="text-xs text-muted">Данные на вашем VPS</p>
             </>
           )}
           <button
@@ -198,8 +294,12 @@ export function SettingsPage({ isPremium, timezone, onTheme, theme = "dark", scr
         confirmLabel="Удалить"
         danger
         onConfirm={async () => {
-          await api.deleteAll();
-          window.location.reload();
+          try {
+            await api.deleteAll();
+            window.location.reload();
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : "Ошибка", "error");
+          }
         }}
         onCancel={() => setDeleteOpen(false)}
       />

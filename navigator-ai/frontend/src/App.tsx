@@ -149,13 +149,16 @@ export default function App() {
                 </div>
               }
             >
-              <BudgetPage isPremium={data?.is_premium ?? false} onRefresh={load} />
+              <BudgetPage />
             </Suspense>
           )}
           {tab === "settings" && (
             <SettingsPage
               isPremium={data?.is_premium ?? false}
               timezone={data?.timezone ?? "Europe/Moscow"}
+              proactiveEnabled={data?.proactive_enabled ?? true}
+              referralCode={data?.referral_code}
+              referralsCount={data?.referrals_count ?? 0}
               onTheme={toggleTheme}
               theme={theme}
               scrollTo={settingsScroll}

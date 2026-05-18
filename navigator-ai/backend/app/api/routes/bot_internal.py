@@ -184,11 +184,18 @@ async def process_message(
         logger.exception("Process failed for user %s", telegram_id)
         raise HTTPException(500, "Ошибка обработки сообщения. Попробуйте позже.") from exc
 
+    tasks_preview = [t.title[:80] for t in result.tasks[:3]]
+    expenses_preview = [
+        f"{e.amount:,.0f} ₽ · {e.category}".replace(",", " ") for e in result.expenses[:3]
+    ]
+
     return {
         "summary": result.summary,
         "tasks_count": len(result.tasks),
         "expenses_count": len(result.expenses),
         "reminders_count": len(result.reminders),
+        "tasks_preview": tasks_preview,
+        "expenses_preview": expenses_preview,
         "insights": result.smart_insights,
         "saved_minutes": user.saved_minutes_today,
         "saved_rub": user.saved_rub_today,

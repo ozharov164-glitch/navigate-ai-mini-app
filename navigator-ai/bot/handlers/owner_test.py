@@ -70,7 +70,17 @@ async def cmd_testmode(message: Message) -> None:
     await _send_panel(message, message.from_user.id)
 
 
-@router.callback_query(F.data.startswith("owner_test_"))
+@router.callback_query(F.data == "owner_test_panel")
+async def owner_test_panel(callback: CallbackQuery) -> None:
+    if not callback.from_user or not _is_owner(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+    await callback.answer()
+    if callback.message:
+        await _send_panel(callback.message, callback.from_user.id)
+
+
+@router.callback_query(F.data.in_({"owner_test_premium", "owner_test_free", "owner_test_auto"}))
 async def owner_test_callback(callback: CallbackQuery) -> None:
     if not callback.from_user or not _is_owner(callback.from_user.id):
         await callback.answer("Недоступно", show_alert=True)
@@ -100,13 +110,3 @@ async def owner_test_callback(callback: CallbackQuery) -> None:
 def owner_test_button_row() -> list[InlineKeyboardButton] | None:
     """Кнопка для /start (только если вызывающий — владелец; проверка снаружи)."""
     return [InlineKeyboardButton(text="🛠 Тест: Premium / Free", callback_data="owner_test_panel")]
-
-
-@router.callback_query(F.data == "owner_test_panel")
-async def owner_test_panel(callback: CallbackQuery) -> None:
-    if not callback.from_user or not _is_owner(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
-        return
-    await callback.answer()
-    if callback.message:
-        await _send_panel(callback.message, callback.from_user.id)

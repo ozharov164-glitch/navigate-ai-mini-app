@@ -44,9 +44,17 @@ export interface DbInsight {
   icon: string;
 }
 
+export interface Reminder {
+  id: number;
+  title: string;
+  remind_at: string;
+  sent: boolean;
+}
+
 export interface Dashboard {
   tasks_today: Task[];
   tasks_completed_today: Task[];
+  reminders_upcoming: Reminder[];
   expenses_month: Expense[];
   insights: Insight[];
   db_insights: DbInsight[];
@@ -60,6 +68,9 @@ export interface Dashboard {
   is_premium: boolean;
   theme: "dark" | "light";
   timezone: string;
+  proactive_enabled: boolean;
+  referral_code: string;
+  referrals_count: number;
 }
 
 export interface AnalyzeResult {
@@ -160,13 +171,18 @@ export const api = {
     return res.json();
   },
   budgetStats: () =>
-    request<{ by_category: { category: string; total: number }[]; total: number; forecast: number }>(
-      "/dashboard/budget-stats"
-    ),
+    request<{
+      by_category: { category: string; total: number }[];
+      total: number;
+      prev_month_total: number;
+      delta_pct: number | null;
+      forecast: number;
+      month_label: string;
+    }>("/dashboard/budget-stats"),
   addExpense: (body: { amount: number; category: string; merchant?: string; description?: string }) =>
     request<Expense>("/dashboard/expenses", { method: "POST", body: JSON.stringify(body) }),
   expenses: () => request<Expense[]>("/dashboard/expenses"),
-  reminders: () => request<{ id: number; title: string; remind_at: string; sent: boolean }[]>("/dashboard/reminders"),
+  reminders: () => request<Reminder[]>("/dashboard/reminders"),
   privacy: () =>
     request<{ stored_items: string[]; retention_policy: string; encryption: string; server_location: string }>(
       "/dashboard/privacy"

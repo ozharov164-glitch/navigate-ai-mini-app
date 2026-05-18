@@ -12,6 +12,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from bot.config import settings
 from bot.handlers import commands, messages, owner_test, payments
 from bot.middlewares.private_only import PrivateChatOnlyMiddleware
+from bot.utils.menu import setup_menu_button
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ async def main() -> None:
         raise RuntimeError("BOT_TOKEN не задан")
 
     bot, dp = await _build_dispatcher()
+    await setup_menu_button(bot)
 
     if settings.webhook_url:
         await _run_webhook(bot, dp)

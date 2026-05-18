@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     free_daily_actions: int = 10
     premium_daily_actions: int = 50
     referral_bonus_days: int = 14
+    referral_referred_bonus_days: int = 7
 
     morning_digest_hour: int = 8
     evening_summary_hour: int = 21

@@ -1,10 +1,10 @@
 /**
  * Главное поле ввода: фото слева, текст по центру, микрофон и «Разобрать» справа.
- * Голосовая запись встроена (без отдельного FAB по центру экрана).
  */
-import { ImagePlus, Loader2, Mic, Send, Square } from "lucide-react";
+import { ImagePlus, Loader2, Lock, Mic, Send, Square } from "lucide-react";
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
+import type { AnalyzeResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { hapticLight } from "@/lib/telegram";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   onDone: () => void;
+  onResult?: (result: AnalyzeResult) => void;
   isPremium: boolean;
   busy?: boolean;
   onBusy?: (v: boolean) => void;
@@ -25,7 +26,7 @@ function pickMimeType(): string {
   return "";
 }
 
-export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
+export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
   const { showToast } = useToast();
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
@@ -41,13 +42,31 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
     streamRef.current = null;
   };
 
+  const handleError = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : "Ошибка";
+    if (msg.includes("429") || msg.toLowerCase().includes("лимит")) {
+      showToast(msg, "error");
+    } else if (msg.includes("403") || msg.toLowerCase().includes("premium")) {
+      showToast(msg, "info");
+    } else {
+      showToast(msg, "error");
+    }
+  };
+
   const wrapBusy = async (fn: () => Promise<void>) => {
     onBusy?.(true);
     try {
       await fn();
+    } catch (e) {
+      handleError(e);
     } finally {
       onBusy?.(false);
     }
+  };
+
+  const handleResult = (result: AnalyzeResult) => {
+    onResult?.(result);
+    showToast(result.summary?.slice(0, 80) || "Готово", "success");
   };
 
   const submitText = async () => {
@@ -56,21 +75,21 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
     hapticLight();
     await wrapBusy(async () => {
       const result = await api.analyze(trimmed);
-      showToast(result.summary?.slice(0, 120) || "Готово", "success");
       setText("");
+      handleResult(result);
       await onDone();
     });
   };
 
   const onPhoto = async (file: File) => {
     if (!isPremium) {
-      showToast("Фото — в Premium. Отправьте чек боту @NavigAI_bot", "info");
+      showToast("Фото — в Premium (@NavigAI_bot или Настройки)", "info");
       return;
     }
     await wrapBusy(async () => {
       const result = await api.analyzePhoto(file, text.trim() || undefined);
-      showToast(result.summary?.slice(0, 120) || "Готово", "success");
       setText("");
+      handleResult(result);
       await onDone();
     });
   };
@@ -88,11 +107,11 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
       return;
     }
     if (!isPremium) {
-      showToast("Голос — в Premium", "info");
+      showToast("Голос — в Premium. Или отправьте голосовое боту @NavigAI_bot", "info");
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      showToast("Голосовое — отправьте боту @NavigAI_bot", "info");
+      showToast("Запись в Mini App недоступна — используйте бота @NavigAI_bot", "info");
       return;
     }
     try {
@@ -111,8 +130,8 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
         setVoiceStatus("Анализирую…");
         await wrapBusy(async () => {
           const result = await api.analyzeVoice(blob, `voice.${ext}`);
-          showToast(result.summary?.slice(0, 100) || "Готово", "success");
           setText("");
+          handleResult(result);
           await onDone();
         });
         setRecording(false);
@@ -154,18 +173,20 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
           }}
         />
 
-        {/* Фото */}
         <button
           type="button"
-          className="input-bar-icon"
-          onClick={() => fileRef.current?.click()}
+          className={cn("input-bar-icon", !isPremium && "input-bar-icon-locked")}
+          onClick={() => (isPremium ? fileRef.current?.click() : showToast("Фото — Premium", "info"))}
           disabled={busy || recording}
           aria-label="Загрузить фото"
         >
-          <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
+          {!isPremium ? (
+            <Lock className="h-4 w-4" />
+          ) : (
+            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
+          )}
         </button>
 
-        {/* Текст */}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -183,22 +204,26 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
           }}
         />
 
-        {/* Микрофон */}
         <button
           type="button"
-          className={cn("input-bar-icon", recording && "input-bar-icon-recording")}
+          className={cn(
+            "input-bar-icon",
+            recording && "input-bar-icon-recording",
+            !isPremium && "input-bar-icon-locked"
+          )}
           onClick={toggleVoice}
           disabled={busy && !recording}
-          aria-label={recording ? "Остановить запись" : "Голосовой ввод"}
+          aria-label={recording ? "Остановить" : "Голос"}
         >
           {recording ? (
             <Square className="h-4 w-4 fill-current" />
+          ) : !isPremium ? (
+            <Lock className="h-4 w-4" />
           ) : (
             <Mic className="h-5 w-5" strokeWidth={1.75} />
           )}
         </button>
 
-        {/* Отправить */}
         <button
           type="button"
           className="input-bar-submit"
@@ -215,7 +240,8 @@ export function InputBar({ onDone, isPremium, busy, onBusy }: Props) {
       </div>
 
       <p className="text-center text-[10px] text-muted">
-        Enter — отправить · Shift+Enter — новая строка
+        Enter — отправить · {!isPremium && "Голос/фото — Premium · "}
+        Shift+Enter — новая строка
       </p>
     </motion.div>
   );

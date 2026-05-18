@@ -18,12 +18,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _web_app_keyboard() -> dict | None:
+    """Inline-кнопка открытия Mini App под напоминаниями и дайджестами."""
+    base = (settings.mini_app_url or "").rstrip("/")
+    if not base.startswith("https://"):
+        return None
+    return {
+        "inline_keyboard": [[{"text": "📱 Открыть НавигаторAI", "web_app": {"url": f"{base}/"}}]]
+    }
+
+
 async def send_telegram_message(chat_id: int, text: str) -> None:
     if not settings.bot_token:
         return
     url = f"https://api.telegram.org/bot{settings.bot_token}/sendMessage"
+    payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    kb = _web_app_keyboard()
+    if kb:
+        payload["reply_markup"] = kb
     async with httpx.AsyncClient(timeout=15.0) as client:
-        await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
+        await client.post(url, json=payload)
 
 
 def _local_today(user: User) -> date:
@@ -90,7 +104,7 @@ async def morning_digest() -> None:
                 continue
 
             task_lines = "\n".join(f"• {t.title}" for t in tasks[:8])
-            text = f"☀️ <b>Утро · НавигаторAI</b>\n\n{task_lines}\n\nОткройте Mini App"
+            text = f"☀️ <b>Утро · НавигаторAI</b>\n\n{task_lines}"
             await send_telegram_message(user.telegram_id, text)
             session.add(
                 Digest(user_id=user.id, digest_type="morning", content=text, insights=[], digest_date=local_date)

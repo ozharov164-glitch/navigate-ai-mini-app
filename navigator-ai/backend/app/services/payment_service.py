@@ -13,21 +13,22 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    def stars_invoice_payload(self, tier: str, user_id: int) -> dict[str, Any]:
+    def stars_invoice_payload(self, tier: str, telegram_id: int) -> dict[str, Any]:
+        """payload использует telegram_id — как в bot/handlers/payments.py."""
         price = settings.stars_basic_price if tier == "basic" else settings.stars_premium_price
         return {
             "title": f"НавигаторAI {tier.upper()}",
-            "description": "Премиум: безлимит, PDF, insights, приоритет AI",
-            "payload": f"stars_{tier}_{user_id}_{uuid.uuid4().hex[:8]}",
+            "description": "Premium: до 50 AI/день, голос, фото, PDF",
+            "payload": f"stars_{tier}_{telegram_id}",
             "currency": "XTR",
             "prices": [{"label": "Подписка", "amount": price}],
         }
 
-    async def create_stars_invoice_link(self, tier: str, user_id: int) -> str | None:
+    async def create_stars_invoice_link(self, tier: str, telegram_id: int) -> str | None:
         """Создаёт ссылку на invoice для Telegram.WebApp.openInvoice."""
         if not settings.bot_token:
             return None
-        payload = self.stars_invoice_payload(tier, user_id)
+        payload = self.stars_invoice_payload(tier, telegram_id)
         body = {
             "title": payload["title"],
             "description": payload["description"],

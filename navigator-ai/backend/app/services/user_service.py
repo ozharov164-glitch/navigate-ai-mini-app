@@ -2,6 +2,7 @@
 import secrets
 from datetime import date, datetime, timedelta, timezone
 
+import pytz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,11 +57,19 @@ class UserService:
     def multimedia_denied_message(self) -> str:
         return "Голос и фото доступны в Premium. Оформите подписку в Mini App."
 
+    def _user_local_date(self, user: User) -> date:
+        tz = pytz.timezone(user.timezone or settings.default_timezone)
+        return datetime.now(tz).date()
+
     def _maybe_reset_daily(self, user: User) -> None:
-        today = date.today()
+        today = self._user_local_date(user)
         if not user.daily_actions_date:
             return
-        d = user.daily_actions_date.date() if hasattr(user.daily_actions_date, "date") else user.daily_actions_date
+        tz = pytz.timezone(user.timezone or settings.default_timezone)
+        stored = user.daily_actions_date
+        if stored.tzinfo is None:
+            stored = stored.replace(tzinfo=timezone.utc)
+        d = stored.astimezone(tz).date()
         if d != today:
             user.daily_actions_count = 0
             user.saved_minutes_today = 0
@@ -113,6 +122,12 @@ class UserService:
         base = referrer.premium_until if referrer.premium_until and referrer.premium_until > now else now
         referrer.premium_until = base + bonus
         referrer.tier = SubscriptionTier.PREMIUM.value
+
+        # Бонус приглашённому
+        referred_bonus = timedelta(days=settings.referral_referred_bonus_days)
+        ref_base = user.premium_until if user.premium_until and user.premium_until > now else now
+        user.premium_until = ref_base + referred_bonus
+        user.tier = SubscriptionTier.PREMIUM.value
         return True
 
     async def extend_premium(self, user: User, days: int = 30, tier: str = SubscriptionTier.PREMIUM.value) -> None:

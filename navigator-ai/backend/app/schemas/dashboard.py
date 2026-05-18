@@ -74,6 +74,7 @@ class DbInsightOut(BaseModel):
 class DashboardOut(BaseModel):
     tasks_today: list[TaskOut]
     tasks_completed_today: list[TaskOut] = Field(default_factory=list)
+    reminders_upcoming: list[ReminderOut] = Field(default_factory=list)
     expenses_month: list[ExpenseOut]
     insights: list[InsightOut]
     db_insights: list[DbInsightOut] = Field(default_factory=list)
@@ -87,6 +88,9 @@ class DashboardOut(BaseModel):
     is_premium: bool
     theme: str = "dark"
     timezone: str = "Europe/Moscow"
+    proactive_enabled: bool = True
+    referral_code: str = ""
+    referrals_count: int = 0
 
 
 class AnalyzeIn(BaseModel):
