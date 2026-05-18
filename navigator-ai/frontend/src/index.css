@@ -581,6 +581,40 @@
   .input-bar-submit:active:not(:disabled) {
     @apply scale-95;
   }
+  .input-bar-submit svg {
+    color: #0a0f1c;
+  }
+  .input-bar-submit:disabled svg {
+    color: #64748b;
+  }
+  html.light .input-bar-submit:disabled svg {
+    color: #94a3b8;
+  }
+  .input-bar-submit-ready {
+    box-shadow: 0 0 28px rgba(0, 229, 201, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .input-bar-analyzing {
+    @apply border-mint/35;
+    box-shadow: 0 0 24px rgba(0, 229, 201, 0.15);
+  }
+
+  .analyze-status-pill {
+    @apply mx-auto flex w-fit items-center gap-2 rounded-full border border-mint/30 bg-mint/10 px-3 py-1.5 backdrop-blur-sm;
+  }
+  .analyze-status-dot {
+    @apply h-2 w-2 rounded-full bg-mint;
+    animation: pulseRing 1.2s ease-in-out infinite;
+  }
+
+  .insight-card {
+    @apply rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 backdrop-blur-sm;
+  }
+  html.light .insight-card {
+    @apply border-slate-200 bg-slate-50;
+  }
+  .insight-dismiss {
+    @apply rounded-lg p-1 text-muted hover:bg-white/10 hover:text-primary;
+  }
   .input-bar-icon-locked {
     @apply opacity-50;
   }
@@ -594,6 +628,13 @@
   }
   html.light .analyze-result-card {
     @apply border-mint/30 bg-mint/5;
+  }
+
+  .budget-hero {
+    @apply border border-mint/15 bg-gradient-to-br from-mint/5 to-transparent;
+  }
+  html.light .budget-hero {
+    @apply border-slate-200 bg-gradient-to-br from-mint/5 to-white;
   }
 
   /* —— Task row —— */

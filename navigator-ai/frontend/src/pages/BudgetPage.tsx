@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { ShoppingBag, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { PiggyBank, ShoppingBag, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { api, type Expense } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/ui/Card";
@@ -41,19 +41,16 @@ export function BudgetPage() {
       .then(([s, e]) => {
         setStats(s);
         const now = new Date();
-        const month = now.getMonth();
-        const year = now.getFullYear();
         setExpenses(
           e.filter((x) => {
             const d = new Date(x.expense_date);
-            return d.getMonth() === month && d.getFullYear() === year;
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
           })
         );
       })
       .catch((err) => {
         showToast(err instanceof Error ? err.message : "Ошибка загрузки", "error");
         setStats(null);
-        setExpenses([]);
       })
       .finally(() => setLoading(false));
   }, [showToast]);
@@ -62,6 +59,10 @@ export function BudgetPage() {
     () => stats?.by_category.map((c, i) => ({ ...c, fill: COLORS[i % COLORS.length] })) ?? [],
     [stats]
   );
+
+  const topCategory = stats?.by_category[0];
+  const dayOfMonth = new Date().getDate();
+  const dailyAvg = stats && dayOfMonth > 0 ? Math.round(stats.total / dayOfMonth) : 0;
 
   if (loading) {
     return (
@@ -79,15 +80,28 @@ export function BudgetPage() {
 
   return (
     <div className="space-y-4 pb-2">
-      <h2 className="heading-display flex items-center gap-2">
-        <Wallet className="h-5 w-5 text-mint" />
-        Бюджет
-      </h2>
-      <p className="text-xs capitalize text-muted">{stats.month_label}</p>
+      <div>
+        <h2 className="heading-display flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-mint" />
+          Бюджет
+        </h2>
+        <p className="mt-1 text-xs capitalize text-muted">{stats.month_label}</p>
+      </div>
+
+      <Card className="budget-hero !p-4">
+        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <PiggyBank className="h-3.5 w-3.5 text-mint" />
+          Учёт без банка
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-secondary">
+          Фиксируем то, что вы сами сообщили AI — чеки, голос, текст. Банк показывает списания; здесь — ваши
+          намерения и категории в одном месте с задачами.
+        </p>
+      </Card>
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="!p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">За месяц</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Потрачено</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-primary">{stats.total.toLocaleString("ru")} ₽</p>
           {delta != null && (
             <p className={`mt-1 flex items-center gap-1 text-[11px] ${deltaUp ? "text-red-400" : "text-emerald-400"}`}>
@@ -98,18 +112,25 @@ export function BudgetPage() {
           )}
         </Card>
         <Card className="!p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Прогноз на месяц</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Прогноз</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-amber-400">
             {Math.round(stats.forecast).toLocaleString("ru")} ₽
           </p>
-          <p className="mt-1 text-[11px] text-muted">Прошлый: {stats.prev_month_total.toLocaleString("ru")} ₽</p>
+          <p className="mt-1 text-[11px] text-muted">~{dailyAvg.toLocaleString("ru")} ₽ в день</p>
         </Card>
       </div>
 
+      {topCategory && (
+        <p className="rounded-xl border border-mint/20 bg-mint/5 px-3 py-2 text-xs text-secondary">
+          Главная статья: <span className="font-semibold text-primary">{topCategory.category}</span> —{" "}
+          {topCategory.total.toLocaleString("ru")} ₽
+        </p>
+      )}
+
       {chartData.length > 0 ? (
         <Card>
-          <p className="section-label mb-2">По категориям</p>
-          <div className="relative h-56">
+          <p className="section-label mb-2">Структура расходов</p>
+          <div className="relative h-52">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -118,8 +139,8 @@ export function BudgetPage() {
                   nameKey="category"
                   cx="50%"
                   cy="50%"
-                  innerRadius={52}
-                  outerRadius={78}
+                  innerRadius={48}
+                  outerRadius={72}
                   paddingAngle={2}
                   stroke="transparent"
                 >
@@ -127,15 +148,7 @@ export function BudgetPage() {
                     <Cell key={entry.category} fill={entry.fill || COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  formatter={(v: number) => [`${v.toLocaleString("ru")} ₽`, ""]}
-                  contentStyle={{
-                    background: "rgba(10, 15, 28, 0.95)",
-                    border: "1px solid rgba(0,229,201,0.2)",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
+                <Tooltip formatter={(v: number) => [`${v.toLocaleString("ru")} ₽`, ""]} />
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -157,35 +170,33 @@ export function BudgetPage() {
         </Card>
       ) : (
         <EmptyState
-          title="Нет расходов за месяц"
-          description="AI добавит расходы из текста, голоса или фото чека на вкладке «Сегодня»"
-          hint="Не дублируем банк — фиксируем то, что вы сами сообщили"
+          title="Расходов пока нет"
+          description="Напишите «кофе 350₽» или отправьте фото чека на вкладке «Сегодня»"
+          hint="AI сам выберет категорию"
         />
       )}
 
       <Card>
-        <p className="section-label mb-4 flex items-center gap-1">
+        <p className="section-label mb-3 flex items-center gap-1">
           <ShoppingBag className="h-3 w-3" />
-          Транзакции · этот месяц
+          Операции за месяц
         </p>
         {expenses.length === 0 ? (
-          <p className="text-sm text-muted">Пока пусто</p>
+          <p className="text-sm text-muted">Появятся после первого разбора</p>
         ) : (
-          <ul className="relative space-y-0">
-            {expenses.map((e, idx) => (
-              <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
-                {idx < expenses.length - 1 && <span className="timeline-line" aria-hidden />}
-                <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm ring-1 ring-white/10">
+          <ul className="space-y-3">
+            {expenses.slice(0, 20).map((e) => (
+              <li key={e.id} className="flex items-center gap-3 border-b border-white/[0.05] pb-3 last:border-0 last:pb-0">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-base">
                   {categoryIcon(e.category)}
                 </span>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-sm font-medium text-primary">{e.merchant || e.category}</p>
-                  <p className="text-xs text-muted">
-                    {e.category} ·{" "}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-primary">{e.merchant || e.category}</p>
+                  <p className="text-[11px] text-muted">
                     {new Date(e.expense_date).toLocaleDateString("ru", { day: "numeric", month: "short" })}
                   </p>
                 </div>
-                <span className="shrink-0 pt-0.5 text-sm font-bold tabular-nums text-red-400">
+                <span className="shrink-0 text-sm font-bold tabular-nums text-red-400/90">
                   −{e.amount.toLocaleString("ru")} ₽
                 </span>
               </li>

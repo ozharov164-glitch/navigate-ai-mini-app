@@ -56,7 +56,7 @@ export function HomePage({ data, onRefresh, isPremium }: Props) {
       )}
 
       {data.db_insights.length > 0 && <DbInsights items={data.db_insights} />}
-      {data.insights.length > 0 && <SmartInsights items={data.insights} />}
+      {data.insights.length > 0 && <SmartInsights items={data.insights} onChange={onRefresh} />}
 
       <section>
         <h3 className="section-label mb-3">Задачи на сегодня</h3>

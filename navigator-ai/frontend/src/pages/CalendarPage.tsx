@@ -1,11 +1,9 @@
 import { Calendar, ChevronLeft, ChevronRight, Download } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Task } from "@/lib/api";
-import { EmptyState } from "@/components/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { CardSkeleton } from "@/components/ui/Skeleton";
-import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
 
@@ -14,9 +12,9 @@ interface Props {
 }
 
 const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.5)]",
-  medium: "bg-gold shadow-[0_0_6px_rgba(255,184,0,0.4)]",
-  low: "bg-mint shadow-[0_0_6px_rgba(0,229,201,0.35)]",
+  high: "bg-red-400",
+  medium: "bg-gold",
+  low: "bg-mint",
 };
 
 function sameDay(a: Date, b: Date) {
@@ -32,7 +30,6 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
   const [allTasks, setAllTasks] = useState<Task[]>(initialTasks);
   const [selected, setSelected] = useState<Date>(() => new Date());
   const [loading, setLoading] = useState(true);
-  const [dayModal, setDayModal] = useState(false);
 
   useEffect(() => {
     api
@@ -59,10 +56,15 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
 
   const monthLabel = month.toLocaleDateString("ru", { month: "long", year: "numeric" });
   const selectedTasks = tasksOnDay(selected);
+  const selectedKey = selected.toDateString();
 
-  const openDay = (day: Date) => {
-    setSelected(day);
-    setDayModal(true);
+  const exportIcal = async () => {
+    try {
+      await api.downloadExport("/export/ical", "navigai.ics");
+      showToast("Откройте файл в календаре (Google, Apple)", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Ошибка экспорта", "error");
+    }
   };
 
   if (loading && allTasks.length === 0) {
@@ -75,8 +77,8 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
   }
 
   return (
-    <div className="space-y-5 pb-2">
-      <motion.div className="flex items-center justify-between gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.div className="space-y-5 pb-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="flex items-center justify-between gap-3">
         <h2 className="heading-display flex items-center gap-2">
           <Calendar className="h-5 w-5 text-mint" strokeWidth={1.75} />
           Календарь
@@ -100,134 +102,93 @@ export function CalendarPage({ tasks: initialTasks }: Props) {
             <ChevronRight className="h-4 w-4 text-secondary" />
           </button>
         </div>
-      </motion.div>
+      </div>
 
-      <Card padding="sm" className="calendar-shell !border-0 !bg-transparent !p-0 !shadow-none">
-        <div className="calendar-shell">
-          <motion.div
-            className="mb-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-muted"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((w) => (
-              <span key={w}>{w}</span>
-            ))}
-          </motion.div>
-          <div className="grid grid-cols-7 gap-1">
-            {daysInMonth.map((day, i) => {
-              if (!day) return <div key={`e-${i}`} className="aspect-square" />;
-              const dayTasks = tasksOnDay(day);
-              const isSelected = sameDay(day, selected);
-              const isToday = sameDay(day, new Date());
-              const priorities = [...new Set(dayTasks.map((t) => t.priority || "low"))].slice(0, 3);
-              return (
-                <motion.button
-                  key={day.toISOString()}
-                  type="button"
-                  onClick={() => openDay(day)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={cn(
-                    "linear-day relative flex flex-col items-center justify-center",
-                    isSelected && "linear-day-selected",
-                    !isSelected && "text-slate-400",
-                    isToday && "linear-day-today"
-                  )}
-                >
-                  <span className={cn(isSelected && "text-mint")}>{day.getDate()}</span>
-                  {priorities.length > 0 && (
-                    <span className="absolute bottom-1.5 flex gap-0.5">
-                      {priorities.map((p) => (
-                        <span key={p} className={cn("h-1 w-1 rounded-full", PRIORITY_DOT[p] || PRIORITY_DOT.low)} />
-                      ))}
-                    </span>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
+      <Card padding="sm" className="calendar-shell">
+        <motion.div className="mb-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+          {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((w) => (
+            <span key={w}>{w}</span>
+          ))}
+        </motion.div>
+        <div className="grid grid-cols-7 gap-1">
+          {daysInMonth.map((day, i) => {
+            if (!day) return <div key={`pad-${i}`} className="aspect-square" />;
+            const dayTasks = tasksOnDay(day);
+            const isSelected = sameDay(day, selected);
+            const isToday = sameDay(day, new Date());
+            const hasTasks = dayTasks.length > 0;
+            return (
+              <button
+                key={day.toISOString()}
+                type="button"
+                onClick={() => setSelected(day)}
+                className={cn(
+                  "linear-day relative flex flex-col items-center justify-center",
+                  isSelected && "linear-day-selected",
+                  !isSelected && "text-slate-400",
+                  isToday && !isSelected && "linear-day-today"
+                )}
+              >
+                <span className={cn(isSelected && "text-mint")}>{day.getDate()}</span>
+                {hasTasks && (
+                  <span className="absolute bottom-1 flex gap-0.5">
+                    {dayTasks.slice(0, 3).map((t) => (
+                      <span
+                        key={t.id}
+                        className={cn("h-1 w-1 rounded-full", PRIORITY_DOT[t.priority] || PRIORITY_DOT.low)}
+                      />
+                    ))}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </Card>
 
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold capitalize text-primary">
-          {selected.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" })}
-        </h3>
-        {selectedTasks.length === 0 ? (
-          <EmptyState
-            title="Нет задач на этот день"
-            description="Выберите другой день или добавьте задачу через поле ввода на «Сегодня»"
-            hint="Календарь синхронизируется с AI"
-          />
-        ) : (
-          <ul className="relative space-y-0">
-            {selectedTasks.map((t, idx) => (
-              <li key={t.id} className="relative flex gap-3 py-2.5 pl-1">
-                {idx < selectedTasks.length - 1 && <span className="timeline-line" />}
-                <span
-                  className={cn(
-                    "relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-midnight",
-                    PRIORITY_DOT[t.priority] || PRIORITY_DOT.low
-                  )}
-                />
-                <motion.div className="min-w-0 flex-1" initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
-                  <span className="mono-time block">
-                    {t.due_date
-                      ? new Date(t.due_date).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })
-                      : "—"}
-                  </span>
-                  <span className={cn("mt-0.5 block text-sm text-secondary", t.completed && "line-through text-muted")}>
-                    {t.title}
-                  </span>
-                </motion.div>
-              </li>
-            ))}
-          </ul>
-        )}
+      <Card className="min-h-[120px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedKey}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+          >
+            <h3 className="mb-3 text-sm font-semibold capitalize text-primary">
+              {selected.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" })}
+            </h3>
+            {selectedTasks.length === 0 ? (
+              <p className="text-sm text-muted">На этот день задач нет. Добавьте на вкладке «Сегодня».</p>
+            ) : (
+              <ul className="space-y-3">
+                {selectedTasks.map((t) => (
+                  <li key={t.id} className="flex gap-3 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0">
+                    <span
+                      className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[t.priority] || PRIORITY_DOT.low)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-sm font-medium text-primary", t.completed && "line-through text-muted")}>
+                        {t.title}
+                      </p>
+                      {t.due_date && (
+                        <p className="mono-time mt-0.5">
+                          {new Date(t.due_date).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </Card>
 
-      <button
-        type="button"
-        className="glass-btn flex w-full items-center justify-center gap-2 text-sm"
-        onClick={() =>
-          api.downloadExport("/export/ical", "navigai.ics").catch((e) =>
-            showToast(e instanceof Error ? e.message : "Ошибка экспорта", "error")
-          )
-        }
-      >
+      <button type="button" className="glass-btn flex w-full items-center justify-center gap-2 text-sm" onClick={exportIcal}>
         <Download className="h-4 w-4" strokeWidth={1.75} />
-        Экспорт iCal
+        Экспорт в календарь (iCal)
       </button>
-
-      <Modal
-        open={dayModal}
-        title={selected.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" })}
-        message={
-          selectedTasks.length === 0 ? (
-            <p className="text-muted">На этот день задач нет</p>
-          ) : (
-            <ul className="max-h-64 space-y-3 overflow-y-auto">
-              {selectedTasks.map((t) => (
-                <li key={t.id} className="flex gap-3 border-b border-white/[0.06] pb-3 last:border-0">
-                  <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[t.priority] || PRIORITY_DOT.low)} />
-                  <div>
-                    <p className={cn("font-medium text-primary", t.completed && "line-through text-muted")}>{t.title}</p>
-                    {t.due_date && (
-                      <p className="text-xs text-muted">
-                        {new Date(t.due_date).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )
-        }
-        confirmLabel="Закрыть"
-        onConfirm={() => setDayModal(false)}
-        onCancel={() => setDayModal(false)}
-      />
-    </div>
+    </motion.div>
   );
 }
-

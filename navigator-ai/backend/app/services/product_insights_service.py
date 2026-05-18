@@ -93,16 +93,6 @@ class ProductInsightsService:
                 }
             )
 
-        if not user_service.is_premium(user):
-            insights.append(
-                {
-                    "id": "premium_tip",
-                    "title": "Premium",
-                    "body": "Безлимит действий, PDF-экспорт и голосовые ответы AI",
-                    "icon": "crown",
-                }
-            )
-
         if user.saved_minutes_today > 0:
             insights.append(
                 {
@@ -123,7 +113,7 @@ class ProductInsightsService:
                 }
             )
 
-        return insights[:6]
+        return insights[:4]
 
 
 product_insights_service = ProductInsightsService()

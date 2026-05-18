@@ -50,6 +50,8 @@ class Settings(BaseSettings):
         '"merchant":"str|null","description":"str|null","currency":"RUB"}],'
         '"reminders":[{"title":"str","remind_at":"ISO8601 UTC"}],'
         '"summary":"краткий итог на русском","smart_insights":["строка"]}. '
+        "smart_insights: максимум 2 короткие практичные подсказки (до 100 символов каждая), "
+        "только по фактам из сообщения — без метафор, философии и общих советов. "
         "Все даты в UTC. Если данных мало — пустые массивы и понятный summary."
     )
 

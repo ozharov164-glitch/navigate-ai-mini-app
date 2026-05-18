@@ -97,9 +97,9 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
     insights = (
         await db.execute(
             select(SmartInsight)
-            .where(SmartInsight.user_id == user.id)
+            .where(SmartInsight.user_id == user.id, SmartInsight.is_read.is_(False))
             .order_by(SmartInsight.created_at.desc())
-            .limit(5)
+            .limit(3)
         )
     ).scalars().all()
 
@@ -287,6 +287,31 @@ async def create_expense(
     db.add(exp)
     await db.flush()
     return ExpenseOut.model_validate(exp)
+
+
+@router.patch("/insights/{insight_id}/dismiss")
+async def dismiss_insight(
+    insight_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    row = (
+        await db.execute(
+            select(SmartInsight).where(SmartInsight.id == insight_id, SmartInsight.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Инсайт не найден")
+    row.is_read = True
+    return {"ok": True}
+
+
+@router.post("/insights/dismiss-all")
+async def dismiss_all_insights(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rows = (
+        await db.execute(select(SmartInsight).where(SmartInsight.user_id == user.id, SmartInsight.is_read.is_(False)))
+    ).scalars().all()
+    for r in rows:
+        r.is_read = True
+    return {"ok": True, "dismissed": len(rows)}
 
 
 @router.get("/reminders", response_model=list[ReminderOut])

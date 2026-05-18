@@ -9,6 +9,33 @@ from backend.app.services.user_service import user_service
 from backend.app.models.user import User
 
 
+# Фразы, которые AI не должен сохранять как «инсайты»
+_INSIGHT_STOPWORDS = (
+    "компас",
+    "метафор",
+    "философ",
+    "помните",
+    "важно помнить",
+    "как известно",
+)
+
+
+def _sanitize_insights(raw: list[str]) -> list[str]:
+    """Не больше 2 коротких, конкретных подсказок."""
+    out: list[str] = []
+    for line in raw:
+        s = (line or "").strip()
+        if len(s) < 8 or len(s) > 120:
+            continue
+        low = s.lower()
+        if any(w in low for w in _INSIGHT_STOPWORDS):
+            continue
+        out.append(s)
+        if len(out) >= 2:
+            break
+    return out
+
+
 class ActionProcessor:
     async def process_message(
         self,
@@ -71,7 +98,7 @@ class ActionProcessor:
             )
         for rem in data.reminders:
             session.add(Reminder(user_id=user.id, title=rem.title, remind_at=rem.remind_at))
-        for insight in data.smart_insights:
+        for insight in _sanitize_insights(data.smart_insights):
             session.add(SmartInsight(user_id=user.id, insight=insight, category="ai"))
 
         if receipt_path and input_type == "photo":

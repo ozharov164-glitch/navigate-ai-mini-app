@@ -1,4 +1,4 @@
-import { getInitData } from "./telegram";
+import { getInitData, openExternalLink } from "./telegram";
 
 export function apiBase(): string {
   const raw = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -190,21 +190,37 @@ export const api = {
   deleteAll: () => request("/dashboard/privacy/delete-all", { method: "DELETE" }),
   updateSettings: (payload: { theme?: string; timezone?: string; proactive_enabled?: boolean }) =>
     request("/dashboard/settings", { method: "PATCH", body: JSON.stringify(payload) }),
+  exportToken: () => request<{ token: string; expires_in: number }>("/export/token"),
+  dismissInsight: (id: number) => request(`/dashboard/insights/${id}/dismiss`, { method: "PATCH" }),
+  dismissAllInsights: () => request<{ ok: boolean; dismissed: number }>("/dashboard/insights/dismiss-all", { method: "POST" }),
+  /** iCal/PDF: токен + openLink — работает в Telegram на телефоне и ПК */
   downloadExport: async (path: "/export/ical" | "/export/pdf", filename: string) => {
     const initData = getInitData();
     if (!initData) throw new Error("Откройте Mini App из Telegram-бота @NavigAI_bot");
-    const res = await fetch(`${API}${path}`, { headers: { "X-Telegram-Init-Data": initData } });
+
+    const { token } = await request<{ token: string }>("/export/token");
+    const base = API.replace(/\/api$/, "");
+    const url = `${base}/api${path}?token=${encodeURIComponent(token)}`;
+
+    if (path === "/export/ical") {
+      openExternalLink(url);
+      return;
+    }
+
+    const res = await fetch(url);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(typeof err.detail === "string" ? err.detail : "Ошибка экспорта");
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = blobUrl;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
   },
   starsInvoice: (tier: string) =>
     request<{ invoice_url: string }>("/payments/stars-invoice", { method: "POST", body: JSON.stringify({ tier }) }),

@@ -241,9 +241,13 @@ export function SettingsPage({
           <button
             type="button"
             className="glass-btn text-xs"
-            onClick={() => api.downloadExport("/export/ical", "navigai.ics").catch(() => showToast("Ошибка", "error"))}
+            onClick={() =>
+              api.downloadExport("/export/ical", "navigai.ics").catch((e) =>
+                showToast(e instanceof Error ? e.message : "Ошибка", "error")
+              )
+            }
           >
-            iCal
+            Календарь (iCal)
           </button>
           <button
             type="button"

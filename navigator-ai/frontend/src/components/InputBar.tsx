@@ -1,11 +1,12 @@
 /**
- * Главное поле ввода: фото слева, текст по центру, микрофон и «Разобрать» справа.
+ * Поле ввода: фото · текст · микрофон · отправка + индикатор анализа.
  */
 import { ImagePlus, Loader2, Lock, Mic, Send, Square } from "lucide-react";
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { AnalyzeResult } from "@/lib/api";
 import { api } from "@/lib/api";
+import { AnalyzeStatus, type AnalyzeKind } from "@/components/AnalyzeStatus";
 import { useToast } from "@/components/Toast";
 import { hapticLight } from "@/lib/telegram";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState<AnalyzeKind | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -44,54 +45,43 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
 
   const handleError = (e: unknown) => {
     const msg = e instanceof Error ? e.message : "Ошибка";
-    if (msg.includes("429") || msg.toLowerCase().includes("лимит")) {
-      showToast(msg, "error");
-    } else if (msg.includes("403") || msg.toLowerCase().includes("premium")) {
-      showToast(msg, "info");
-    } else {
-      showToast(msg, "error");
-    }
+    if (msg.includes("429") || msg.toLowerCase().includes("лимит")) showToast(msg, "error");
+    else if (msg.includes("403") || msg.toLowerCase().includes("premium")) showToast(msg, "info");
+    else showToast(msg, "error");
   };
 
-  const wrapBusy = async (fn: () => Promise<void>) => {
+  const runAnalyze = async (kind: AnalyzeKind, fn: () => Promise<AnalyzeResult>) => {
     onBusy?.(true);
+    setAnalyzing(kind);
     try {
-      await fn();
+      const result = await fn();
+      onResult?.(result);
+      showToast(result.summary?.slice(0, 80) || "Готово", "success");
+      await onDone();
     } catch (e) {
       handleError(e);
     } finally {
+      setAnalyzing(null);
       onBusy?.(false);
     }
   };
 
-  const handleResult = (result: AnalyzeResult) => {
-    onResult?.(result);
-    showToast(result.summary?.slice(0, 80) || "Готово", "success");
-  };
-
   const submitText = async () => {
     const trimmed = text.trim();
-    if (!trimmed || busy || recording) return;
+    if (!trimmed || busy || recording || analyzing) return;
     hapticLight();
-    await wrapBusy(async () => {
-      const result = await api.analyze(trimmed);
-      setText("");
-      handleResult(result);
-      await onDone();
-    });
+    setText("");
+    await runAnalyze("text", () => api.analyze(trimmed));
   };
 
   const onPhoto = async (file: File) => {
     if (!isPremium) {
-      showToast("Фото — в Premium (@NavigAI_bot или Настройки)", "info");
+      showToast("Фото — в Premium. Оформите в Настройках", "info");
       return;
     }
-    await wrapBusy(async () => {
-      const result = await api.analyzePhoto(file, text.trim() || undefined);
-      setText("");
-      handleResult(result);
-      await onDone();
-    });
+    if (busy || analyzing) return;
+    await runAnalyze("photo", () => api.analyzePhoto(file, text.trim() || undefined));
+    setText("");
   };
 
   const stopRecording = () => {
@@ -107,11 +97,11 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
       return;
     }
     if (!isPremium) {
-      showToast("Голос — в Premium. Или отправьте голосовое боту @NavigAI_bot", "info");
+      showToast("Голос — в Premium или отправьте боту @NavigAI_bot", "info");
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      showToast("Запись в Mini App недоступна — используйте бота @NavigAI_bot", "info");
+      showToast("Запись недоступна — используйте бота @NavigAI_bot", "info");
       return;
     }
     try {
@@ -125,41 +115,36 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
       };
       recorder.onstop = async () => {
         stopStream();
+        setRecording(false);
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const ext = blob.type.includes("mp4") ? "m4a" : "webm";
-        setVoiceStatus("Анализирую…");
-        await wrapBusy(async () => {
-          const result = await api.analyzeVoice(blob, `voice.${ext}`);
-          setText("");
-          handleResult(result);
-          await onDone();
-        });
-        setRecording(false);
-        setVoiceStatus(null);
+        await runAnalyze("voice", () => api.analyzeVoice(blob, `voice.${ext}`));
       };
       recorderRef.current = recorder;
       recorder.start();
       setRecording(true);
-      setVoiceStatus("Говорите…");
     } catch {
       stopStream();
       showToast("Нет доступа к микрофону", "error");
     }
   };
 
+  const canSend = Boolean(text.trim()) && !busy && !recording && !analyzing;
+
   return (
-    <motion.div
-      className="space-y-2"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      {voiceStatus && (
-        <p className="text-center text-xs font-medium text-mint animate-fade-in">{voiceStatus}</p>
+    <motion.div className="space-y-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <AnimatePresence>{analyzing && <AnalyzeStatus kind={analyzing} />}</AnimatePresence>
+      {recording && !analyzing && (
+        <p className="text-center text-xs font-medium text-mint">Говорите… нажмите микрофон, чтобы остановить</p>
       )}
 
       <div
-        className={cn("input-bar", focused && "input-bar-focused", recording && "input-bar-recording")}
+        className={cn(
+          "input-bar",
+          focused && "input-bar-focused",
+          recording && "input-bar-recording",
+          analyzing && "input-bar-analyzing"
+        )}
       >
         <input
           ref={fileRef}
@@ -177,14 +162,10 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
           type="button"
           className={cn("input-bar-icon", !isPremium && "input-bar-icon-locked")}
           onClick={() => (isPremium ? fileRef.current?.click() : showToast("Фото — Premium", "info"))}
-          disabled={busy || recording}
-          aria-label="Загрузить фото"
+          disabled={busy || recording || !!analyzing}
+          aria-label="Фото"
         >
-          {!isPremium ? (
-            <Lock className="h-4 w-4" />
-          ) : (
-            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
-          )}
+          {!isPremium ? <Lock className="h-4 w-4" /> : <ImagePlus className="h-5 w-5" strokeWidth={1.75} />}
         </button>
 
         <textarea
@@ -194,7 +175,7 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
           onBlur={() => setFocused(false)}
           placeholder="Задача, расход, напоминание..."
           rows={2}
-          disabled={recording}
+          disabled={recording || !!analyzing}
           className="input-bar-text"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -206,14 +187,10 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
 
         <button
           type="button"
-          className={cn(
-            "input-bar-icon",
-            recording && "input-bar-icon-recording",
-            !isPremium && "input-bar-icon-locked"
-          )}
+          className={cn("input-bar-icon", recording && "input-bar-icon-recording", !isPremium && "input-bar-icon-locked")}
           onClick={toggleVoice}
-          disabled={busy && !recording}
-          aria-label={recording ? "Остановить" : "Голос"}
+          disabled={(busy && !recording) || !!analyzing}
+          aria-label="Голос"
         >
           {recording ? (
             <Square className="h-4 w-4 fill-current" />
@@ -226,21 +203,21 @@ export function InputBar({ onDone, onResult, isPremium, busy, onBusy }: Props) {
 
         <button
           type="button"
-          className="input-bar-submit"
-          disabled={busy || recording || !text.trim()}
+          className={cn("input-bar-submit", canSend && "input-bar-submit-ready")}
+          disabled={!canSend}
           onClick={submitText}
           aria-label="Разобрать"
         >
-          {busy && !recording ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+          {analyzing ? (
+            <Loader2 className="h-5 w-5 animate-spin text-midnight" />
           ) : (
-            <Send className="h-5 w-5" strokeWidth={2} />
+            <Send className="h-5 w-5 text-midnight" strokeWidth={2.25} />
           )}
         </button>
       </div>
 
       <p className="text-center text-[10px] text-muted">
-        Enter — отправить · {!isPremium && "Голос/фото — Premium · "}
+        Enter — отправить · {!isPremium && "Голос и фото — Premium · "}
         Shift+Enter — новая строка
       </p>
     </motion.div>
